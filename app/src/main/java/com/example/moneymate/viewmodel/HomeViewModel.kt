@@ -1,0 +1,162 @@
+package com.example.moneymate.viewmodel
+
+import android.icu.util.Calendar
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.moneymate.domain.Result
+import com.example.moneymate.domain.model.Expense
+import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.domain.repository.ExpenseRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class ChartData(
+    val categoryName: String,
+    val totalAmount: Double,
+    val percentage: Float,
+    val color: String
+)
+
+
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val repository: ExpenseRepository
+) : ViewModel() {
+
+    var selectedPeriod by mutableStateOf("Ngày")
+    // Lắng nghe tất cả giao dịch từ DB
+    private val _expensesState = MutableStateFlow<Result<List<Expense>>>(Result.Loading)
+    val expensesState: StateFlow<Result<List<Expense>>> = _expensesState
+    var detailSortType by mutableStateOf("Thời gian")
+    var currentCalendar by mutableStateOf(Calendar.getInstance())
+
+
+    init {
+        loadAllExpenses()
+    }
+
+     fun loadAllExpenses() {
+        viewModelScope.launch {
+            repository.getAllExpenses().collect { result ->
+                _expensesState.value = result
+            }
+        }
+    }
+
+    fun getTimeRange(period: String): Pair<Long,Long>{
+        val calendar = Calendar.getInstance()
+        val end = calendar.timeInMillis
+
+        when(period){
+            "Ngày" -> {
+                calendar.set(Calendar.HOUR_OF_DAY,0)
+                calendar.set(Calendar.MINUTE,0)
+            }
+            "Tuần" -> calendar.add(Calendar.DAY_OF_WEEK,-7)
+            "Tháng" -> calendar.add(Calendar.MONTH,-1)
+            "Năm" -> calendar.add(Calendar.YEAR,-1)
+        }
+        return Pair(calendar.timeInMillis,end)
+    }
+
+    // Trong getChartData (HomeViewModel)
+    fun getChartData(selectedType: String): Flow<List<ChartData>> = _expensesState.map { result ->
+        if(result is Result.Success){
+            val typeEnum = if(selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+            val range = getTimeRange(selectedPeriod) // Lấy khoảng thời gian đang chọn
+
+            // Lọc cả LOẠI và THỜI GIAN
+            val filtered = result.data.filter {
+                it.type == typeEnum && it.timestamp >= range.first && it.timestamp <= range.second
+            }
+
+            val total = filtered.sumOf { it.amount }
+            if(total == 0.0) return@map emptyList()
+
+            filtered.groupBy { it.category.id }
+                .map { (_, items) ->
+                    val catTotal = items.sumOf { it.amount }
+                    val category = items.first().category
+                    ChartData(
+                        categoryName = category.title,
+                        totalAmount = catTotal,
+                        percentage = ((catTotal/total)*100).toFloat(),
+                        color = category.colorHex
+                    )
+                }.sortedByDescending { it.totalAmount }
+        } else emptyList()
+    }
+
+    // Hàm logic tính tổng số dư
+    fun calculateTotalBalance(expenses: List<Expense>): Double {
+        return expenses.sumOf {
+            if (it.type == TransactionType.INCOME) it.amount else -it.amount
+        }
+    }
+
+    fun deleteExpense(expense: Expense, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteExpense(expense) // Đảm bảo repository đã có hàm delete
+            onSuccess()
+        }
+    }
+
+    // Hàm lấy danh sách giao dịch theo Category ID (Dùng cho DetailListScreen)
+    fun getExpensesByCategory(categoryId: Long, type: String): Flow<List<Expense>> {
+        return repository.getAllExpenses().map { result ->
+            if (result is Result.Success) {
+                result.data.filter {
+                    it.category.id == categoryId &&
+                            (if (type == "CHI PHÍ") it.type == TransactionType.SPEND else it.type == TransactionType.INCOME)
+                }
+            } else emptyList()
+        }
+    }
+
+    fun getFilteredExpenses(
+        type: String,
+        period: String,
+        categoryId: Long = 0
+    ): Flow<List<Expense>> = _expensesState.map { result ->
+        if (result is Result.Success) {
+            val range = getTimeRange(period)
+            val typeEnum = if (type == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+
+            var list = result.data.filter {
+                val matchType = it.type == typeEnum
+                val matchTime = it.timestamp >= range.first && it.timestamp <= range.second
+                val matchCat = if (categoryId == 0L) true else it.category.id == categoryId
+                matchType && matchTime && matchCat
+            }
+
+            // Sắp xếp
+            list = if (detailSortType == "Số tiền") {
+                list.sortedByDescending { it.amount }
+            } else {
+                list.sortedByDescending { it.timestamp }
+            }
+            list
+        } else emptyList()
+    }
+
+    fun moveTimeRange(delta: Int) {
+        val newCalendar = currentCalendar.clone() as Calendar
+        when (selectedPeriod) { // selectedPeriod là biến bạn quản lý trong ViewModel
+            "Ngày" -> newCalendar.add(Calendar.DAY_OF_YEAR, delta)
+            "Tuần" -> newCalendar.add(Calendar.WEEK_OF_YEAR, delta)
+            "Tháng" -> newCalendar.add(Calendar.MONTH, delta)
+            "Năm" -> newCalendar.add(Calendar.YEAR, delta)
+        }
+        currentCalendar = newCalendar
+        loadAllExpenses() // Gọi lại hàm load từ DB
+    }
+}
