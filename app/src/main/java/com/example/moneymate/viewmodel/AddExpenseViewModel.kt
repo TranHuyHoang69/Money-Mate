@@ -1,6 +1,5 @@
 package com.example.moneymate.viewmodel
 
-// QUAN TRỌNG: Đảm bảo import đúng Category của project
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -27,12 +26,20 @@ class AddExpenseViewModel @Inject constructor(
 
     var amount by mutableStateOf("")
     var note by mutableStateOf("")
-    var selectedType by mutableStateOf("CHI PHÍ")
 
-    // Đảm bảo kiểu dữ liệu là Category? từ model của bạn
+    // FIX LỖI 1: Sử dụng backing field để định nghĩa custom setter
+    private var _selectedType = mutableStateOf(TransactionType.SPEND.name)
+    var selectedType: String
+        get() = _selectedType.value
+        set(value) {
+            _selectedType.value = value
+            loadCategories() // Tải lại danh mục khi đổi tab
+        }
+
     var selectedCategory by mutableStateOf<Category?>(null)
     var currentExpenseId by mutableStateOf(-1L)
     var selectedDate by mutableStateOf(System.currentTimeMillis())
+
     private val _categories = MutableStateFlow<Result<List<Category>>>(Result.Loading)
     val categories: StateFlow<Result<List<Category>>> = _categories
 
@@ -42,25 +49,32 @@ class AddExpenseViewModel @Inject constructor(
 
     private fun loadCategories() {
         viewModelScope.launch {
-            // Đảm bảo repository.getAllCategories() trả về Flow
-            repository.getAllCategories().collect { _categories.value = it }
+            _categories.value = Result.Loading
+            repository.getCategoriesByType(selectedType).collect { result ->
+                _categories.value = result
+
+                // FIX LỖI 3: Kiểm tra kiểu Success với star projection hoặc gán kiểu cụ thể
+                if (result is Result.Success<List<Category>>) {
+                    val currentList = result.data
+                    // Reset nếu danh mục đã chọn không nằm trong tab mới
+                    if (selectedCategory != null && currentList.none { it.id == selectedCategory?.id }) {
+                        selectedCategory = null
+                    }
+                }
+            }
         }
     }
 
     fun loadExpenseDetails(expenseId: Long) {
         if (expenseId == -1L || currentExpenseId == expenseId) return
         currentExpenseId = expenseId
-
         viewModelScope.launch {
-            // Vì getExpenseById trả về Flow<Result<Expense?>>
-            // Chúng ta dùng .collect để lắng nghe dữ liệu
             repository.getExpenseById(expenseId).collect { result ->
-                if (result is Result.Success) {
-                    val expenseData = result.data
-                    if (expenseData != null) {
+                if (result is Result.Success<Expense?>) {
+                    result.data?.let { expenseData ->
                         amount = expenseData.amount.toString()
                         note = expenseData.note
-                        selectedType = if (expenseData.type == TransactionType.SPEND) "CHI PHÍ" else "THU NHẬP"
+                        _selectedType.value = expenseData.type.name
                         selectedCategory = expenseData.category
                         selectedDate = expenseData.timestamp
                     }
@@ -70,12 +84,14 @@ class AddExpenseViewModel @Inject constructor(
     }
 
     fun onAmountChange(newValue: String) {
-        if (newValue.all { it.isDigit() || it == '.' }) amount = newValue
+        if (newValue.all { it.isDigit() || it == '.' } && newValue.count { it == '.' } <= 1) {
+            amount = newValue
+        }
     }
 
     fun saveExpense(onSuccess: () -> Unit) {
         val amountDouble = amount.toDoubleOrNull() ?: 0.0
-        val type = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+        val type = TransactionType.valueOf(selectedType)
         val category = selectedCategory ?: return
 
         viewModelScope.launch {
@@ -85,17 +101,10 @@ class AddExpenseViewModel @Inject constructor(
                 note = note,
                 type = type,
                 category = category,
-                // SỬA TẠI ĐÂY: Thay System.currentTimeMillis() bằng selectedDate
                 timestamp = selectedDate
             )
-
-            if (currentExpenseId == -1L) {
-                repository.insertExpense(expense)
-            } else {
-                repository.updateExpense(expense)
-            }
-
-            onSuccess()
+            val result = if (currentExpenseId == -1L) repository.insertExpense(expense) else repository.updateExpense(expense)
+            if (result is Result.Success) onSuccess()
         }
     }
 
@@ -104,4 +113,3 @@ class AddExpenseViewModel @Inject constructor(
         return sdf.format(Date(timestamp))
     }
 }
-

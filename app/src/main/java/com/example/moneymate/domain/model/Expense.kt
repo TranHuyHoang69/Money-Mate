@@ -9,6 +9,7 @@ data class Category(
     val title: String,
     val iconResName: String,
     val colorHex: String,
+    val type: String,
     val isDefault: Boolean = false
 )
 

@@ -16,18 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -36,11 +35,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -51,17 +52,19 @@ import androidx.navigation.NavController
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.viewmodel.AddExpenseViewModel
+import java.net.URLEncoder
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun AddScreen(
     navController: NavController,
-    viewModel: AddExpenseViewModel = hiltViewModel() // Tích hợp ViewModel
+    viewModel: AddExpenseViewModel = hiltViewModel()
 ) {
-    // Lấy trạng thái dữ liệu từ ViewModel
     val categoriesState by viewModel.categories.collectAsState()
     val themeColor = if (viewModel.selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
-
 
     Column(
         modifier = Modifier
@@ -75,11 +78,11 @@ fun AddScreen(
             onBack = { navController.popBackStack() }
         )
 
-        // Truyền ViewModel và CategoriesState xuống Form
         FormSection(
             viewModel = viewModel,
             themeColor = themeColor,
             categoriesState = categoriesState,
+            navController = navController,
             onSuccess = { navController.popBackStack() }
         )
     }
@@ -92,6 +95,7 @@ fun HeaderAdd(
     onTabSelected: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val options = listOf("SPEND" to "CHI PHÍ", "INCOME" to "THU NHẬP")
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -99,6 +103,7 @@ fun HeaderAdd(
             .background(themeColor)
             .padding(24.dp)
     ) {
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Default.ArrowBack,
@@ -121,17 +126,17 @@ fun HeaderAdd(
                 .background(Color.Black.copy(0.15f))
                 .padding(4.dp)
         ) {
-            listOf("CHI PHÍ", "THU NHẬP").forEach { title ->
-                val isSelected = selectedType == title
+            options.forEach { (logicName, displayName) ->
+                val isSelected = selectedType == logicName
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSelected) Color.White.copy(0.25f) else Color.Transparent)
-                        .clickable { onTabSelected(title) }
+                        .clickable { onTabSelected(logicName) }
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = title,
+                        text = displayName,
                         color = if (isSelected) Color.White else Color.White.copy(0.6f),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -146,6 +151,7 @@ fun HeaderAdd(
 fun FormSection(
     viewModel: AddExpenseViewModel,
     themeColor: Color,
+    navController: NavController,
     categoriesState: Result<List<Category>>,
     onSuccess: () -> Unit
 ) {
@@ -169,7 +175,7 @@ fun FormSection(
                     color = themeColor
                 ),
                 placeholder = { Text("0.00", fontSize = 28.sp, color = Color.LightGray) },
-                trailingIcon = { Text("$", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor) },
+                trailingIcon = { Text("₫", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 shape = RoundedCornerShape(20.dp),
@@ -184,13 +190,18 @@ fun FormSection(
             Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(modifier = Modifier.height(12.dp))
 
-            when (categoriesState) {
+            // SỬA LỖI: Sử dụng 'val state' để gán giá trị và smart-cast thành công
+            when (val state = categoriesState) {
                 is Result.Success -> {
                     CategoryGrid(
-                        categories = categoriesState.data,
+                        categories = state.data,
                         themeColor = themeColor,
                         selectedCategory = viewModel.selectedCategory,
-                        onCategorySelect = { viewModel.selectedCategory = it }
+                        onCategorySelect = { viewModel.selectedCategory = it },
+                        onSeeMoreClick = {
+                            val encodedType = URLEncoder.encode(viewModel.selectedType, "UTF-8")
+                            navController.navigate("category_management/$encodedType") // Nhảy vào màn quản lý trước
+                        }
                     )
                 }
                 is Result.Loading -> {
@@ -198,7 +209,10 @@ fun FormSection(
                         CircularProgressIndicator(color = themeColor)
                     }
                 }
-                else -> { Text("Lỗi tải danh mục", color = Color.Red) }
+                is Result.Error -> {
+                    // SỬA LỖI: Dùng state.message theo đúng file Result.kt của bạn
+                    Text("Lỗi: ${state.message}", color = Color.Red)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -210,7 +224,6 @@ fun FormSection(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    // PHẦN CHỌN NGÀY GIAO DỊCH
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -226,21 +239,17 @@ fun FormSection(
                             Text("Ngày giao dịch", color = Color.Gray, fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = formatTimestamp(viewModel.selectedDate),
+                                text = formatLongToDateString(viewModel.selectedDate), // Dùng tên hàm mới
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.Black
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = themeColor
-                        )
+                        Icon(Icons.Default.DateRange, contentDescription = null, tint = themeColor)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEEEEEE)))
+                    HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text("Ghi chú", color = Color.Gray, fontSize = 14.sp)
@@ -277,22 +286,54 @@ fun CategoryGrid(
     categories: List<Category>,
     themeColor: Color,
     selectedCategory: Category?,
-    onCategorySelect: (Category) -> Unit
+    onCategorySelect: (Category) -> Unit,
+    onSeeMoreClick: () -> Unit
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        modifier = Modifier.height(180.dp),
-        userScrollEnabled = false
-    ) {
-        items(categories) { category ->
-            val isSelected = selectedCategory?.id == category.id
-            CategoryItem(
-                category = category,
-                themeColor = themeColor,
-                isSelected = isSelected,
-                onClick = { onCategorySelect(category) }
-            )
+    // Sửa lỗi: Sử dụng Chiều cao cố định hoặc Modifier.heightIn
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val displayItems = categories.take(7)
+
+        // Chia item thành các hàng (mỗi hàng 4 cái)
+        val rows = displayItems.chunked(4)
+
+        rows.forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                rowItems.forEach { category ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        CategoryItem(
+                            category = category,
+                            themeColor = try { Color(android.graphics.Color.parseColor(category.colorHex)) } catch (e: Exception) { themeColor },
+                            isSelected = selectedCategory?.id == category.id,
+                            onClick = { onCategorySelect(category) }
+                        )
+                    }
+                }
+                // Nếu hàng đầu tiên chưa đủ 4 cái, thêm nút "Cài đặt" vào cuối hàng đó
+                if (rowItems.size < 4) {
+                    Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
+                    // Fill nốt khoảng trống nếu vẫn thiếu
+                    repeat(4 - rowItems.size - 1) { Spacer(Modifier.weight(1f)) }
+                }
+            }
         }
+
+        // Nếu hàng cuối cùng đã đủ 4, thì nút "Cài đặt" nằm ở hàng mới
+        if (displayItems.size % 4 == 0) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
+                repeat(3) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddCategoryButton(onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp).clickable { onClick() }) {
+        Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(18.dp)).background(Color.LightGray.copy(0.2f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Add, null, tint = Color.Gray)
+        }
+        Text("Xem thêm", fontSize = 11.sp, color = Color.Gray)
     }
 }
 
@@ -303,6 +344,11 @@ fun CategoryItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val resId = remember(category.iconResName) {
+        context.resources.getIdentifier(category.iconResName, "drawable", context.packageName)
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -316,12 +362,16 @@ fun CategoryItem(
                 .background(if (isSelected) themeColor else themeColor.copy(0.1f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Bookmark,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else themeColor,
-                modifier = Modifier.size(24.dp)
-            )
+            if (resId != 0) {
+                Icon(
+                    painter = painterResource(id = resId),
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else themeColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(Icons.Default.Bookmark, contentDescription = null, tint = if (isSelected) Color.White else themeColor)
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -334,28 +384,30 @@ fun CategoryItem(
     }
 }
 
+// SỬA LỖI: Đổi tên hàm thành formatLongToDateString để tránh trùng lặp
+fun formatLongToDateString(timestamp: Long): String {
+    return try {
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        sdf.format(Date(timestamp))
+    } catch (e: Exception) {
+        "Sai định dạng"
+    }
+}
 
-fun showDatePicker(
-    context: Context,
-    onDateSelected: (Long) -> Unit
-) {
+fun showDatePicker(context: Context, onDateSelected: (Long) -> Unit) {
     val calendar = Calendar.getInstance()
-    val year = calendar.get(Calendar.YEAR)
-    val month = calendar.get(Calendar.MONTH)
-    val day = calendar.get(Calendar.DAY_OF_MONTH)
-
-    val datePickerDialog = android.app.DatePickerDialog(
+    android.app.DatePickerDialog(
         context,
-        { _, selectedYear, selectedMonth, selectedDay ->
-            val resultCalendar = Calendar.getInstance()
-            resultCalendar.set(selectedYear, selectedMonth, selectedDay)
-            onDateSelected(resultCalendar.timeInMillis)
+        { _, y, m, d ->
+            val res = Calendar.getInstance()
+            res.set(y, m, d)
+            onDateSelected(res.timeInMillis)
         },
-        year, month, day
-    )
-
-    // GIỚI HẠN: Chỉ cho phép chọn từ ngày hiện tại trở về trước
-    datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
-
-    datePickerDialog.show()
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    ).apply {
+        datePicker.maxDate = System.currentTimeMillis()
+        show()
+    }
 }

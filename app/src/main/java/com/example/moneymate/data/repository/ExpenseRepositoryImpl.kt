@@ -50,6 +50,10 @@ class ExpenseRepositoryImpl @Inject constructor(
             Result.Success(domainList) as Result<List<Category>>
         }.onStart { emit(Result.Loading) }
             .catch { emit(Result.Error(it.message ?: "Error")) }
+    override fun getCategoriesByType(type: String): Flow<Result<List<Category>>> =
+        categoryDao.getCategoriesByType(type).map { list ->
+            Result.Success(list.map { it.toDomain() }) as Result<List<Category>>
+        }.onStart { emit(Result.Loading) }.catch { emit(Result.Error(it.message ?: "Error")) }
 
     // --- Các hàm suspend khác giữ nguyên logic try-catch như hôm trước ---
     override suspend fun insertExpense(expense: Expense) = try {

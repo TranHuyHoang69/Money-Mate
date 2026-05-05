@@ -23,26 +23,37 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,18 +72,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.item.ExpenseItem
+import com.example.moneymate.viewmodel.AuthViewModel
 import com.example.moneymate.viewmodel.CalendarMode
 import com.example.moneymate.viewmodel.ChartData
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.HomeViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
     historyViewModel: HistoryViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    // --- STATE HIỆN TẠI CỦA BẠN ---
     val expensesByPeriod by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
     val allExpensesResult by homeViewModel.expensesState.collectAsState()
@@ -81,11 +96,110 @@ fun HomeScreen(
     var selectedType by remember { mutableStateOf("CHI PHÍ") }
     val themeColor = if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
 
-    // --- 1. STATE CHO DATE RANGE PICKER ---
+    // --- DRAWER STATE ---
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val authUiState by authViewModel.uiState.collectAsState()
+
+    val totalBalance = remember(allExpensesResult) {
+        if (allExpensesResult is com.example.moneymate.domain.Result.Success) {
+            val data = (allExpensesResult as com.example.moneymate.domain.Result.Success).data
+            val income = data.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
+            val spend = data.filter { it.type == TransactionType.SPEND }.sumOf { it.amount }
+            income - spend
+        } else 0.0
+    }
+
+    // --- NỘI DUNG DRAWER ---
+    val drawerContent = @Composable {
+        ModalDrawerSheet {
+            Spacer(modifier = Modifier.height(16.dp))
+            Column(modifier = Modifier.padding(24.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(themeColor.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = authUiState.user?.userName?.take(1)?.uppercase() ?: "U",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = themeColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = authUiState.user?.userName ?: "Người dùng",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Số dư: ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${String.format("%,.0f", totalBalance)} đ",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (totalBalance >= 0) themeColor else Color.Red, // Đổi màu nếu âm tiền
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            NavigationDrawerItem(
+                label = { Text("Trang chủ") },
+                selected = true,
+                icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                onClick = { scope.launch { drawerState.close() } },
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+
+            NavigationDrawerItem(
+                label = { Text("Lịch sử giao dịch") },
+                selected = false,
+                icon = { Icon(Icons.Default.History, contentDescription = null) },
+                onClick = {
+                    scope.launch {
+                        drawerState.close()
+                        navController.navigate("history_all")
+                    }
+                },
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            NavigationDrawerItem(
+                label = { Text("Đăng xuất") },
+                selected = false, // Luôn để false vì đây là hành động, không phải màn hình điều hướng
+                icon = { Icon(Icons.Default.Logout, contentDescription = null) },
+                onClick = {
+                    scope.launch {
+                        drawerState.close()
+                        authViewModel.logout()
+                    }
+                },
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                // --- TÙY CHỈNH MÀU SẮC TẠI ĐÂY ---
+                colors = NavigationDrawerItemDefaults.colors(
+                    // Màu cho Text khi không chọn
+                    unselectedTextColor = MaterialTheme.colorScheme.error,
+                    // Màu cho Icon khi không chọn (Tham số bạn vừa đề cập)
+                    unselectedIconColor = MaterialTheme.colorScheme.error
+                )
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+
+    // --- LOGIC DATE PICKER & DATA (Giữ nguyên) ---
     var showDatePicker by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
 
-    // --- 2. DIALOG CHỌN KHOẢNG THỜI GIAN ---
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -118,16 +232,6 @@ fun HomeScreen(
         }
     }
 
-    // --- 3. LOGIC TÍNH TOÁN DỮ LIỆU ---
-    val totalBalance = remember(allExpensesResult) {
-        if (allExpensesResult is com.example.moneymate.domain.Result.Success) {
-            val data = (allExpensesResult as com.example.moneymate.domain.Result.Success).data
-            val income = data.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-            val spend = data.filter { it.type == TransactionType.SPEND }.sumOf { it.amount }
-            income - spend
-        } else 0.0
-    }
-
     val categoryGroupedList = remember(expensesByPeriod, selectedType) {
         val filtered = expensesByPeriod.filter { expense ->
             if (selectedType == "CHI PHÍ") expense.type == TransactionType.SPEND
@@ -155,7 +259,6 @@ fun HomeScreen(
         }
     }
 
-    // --- 4. LOGIC MORPHING ---
     val morphProgress by remember {
         derivedStateOf {
             if (scrollState.firstVisibleItemIndex > 0) 1f
@@ -164,111 +267,153 @@ fun HomeScreen(
     }
     val dynamicChartHeight = (180 - (120 * morphProgress)).dp
 
-    Box(modifier = Modifier.fillMaxSize().background(themeColor)) {
-        HeaderSection(selectedType, totalBalance, { selectedType = it }, navController)
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 250.dp)
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(Color(0xFFF8F9FA))
-        ) {
-            // Thanh điều hướng thời gian
-            TimeNavigationHeader(
-                viewModel = historyViewModel,
-                themeColor = themeColor,
-                onCustomRangeClick = { showDatePicker = true }
+    // --- BẮT ĐẦU UI VỚI DRAWER ---
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = drawerContent,
+        gesturesEnabled = true
+    ) {
+        Box(modifier = Modifier.fillMaxSize().background(themeColor)) {
+            // TRUYỀN THÊM ACTION MỞ DRAWER VÀO HEADER
+            HeaderSection(
+                selectedType = selectedType,
+                totalBalance = totalBalance,
+                onTabSelected = { selectedType = it },
+                navController = navController,
+                onMenuClick = { scope.launch { drawerState.open() } } // Thêm dòng này
             )
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    state = scrollState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
-                ) {
-                    item { Spacer(modifier = Modifier.height(180.dp)) }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 250.dp)
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Color(0xFFF8F9FA))
+            ) {
+                TimeNavigationHeader(
+                    viewModel = historyViewModel,
+                    themeColor = themeColor,
+                    onCustomRangeClick = { showDatePicker = true }
+                )
 
-                    item {
-                        Text(
-                            "Phân tích chi tiêu",
-                            modifier = Modifier.padding(start = 24.dp, bottom = 12.dp),
-                            fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray
-                        )
-                    }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+                    ) {
+                        item { Spacer(modifier = Modifier.height(180.dp)) }
 
-                    if (isLoading) {
                         item {
-                            Box(Modifier.fillMaxWidth().padding(50.dp), Alignment.Center) {
-                                CircularProgressIndicator(color = themeColor)
-                            }
+                            Text(
+                                "Phân tích chi tiêu",
+                                modifier = Modifier.padding(start = 24.dp, bottom = 12.dp),
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray
+                            )
                         }
-                    } else if (categoryGroupedList.isEmpty()) {
-                        item { EmptyStateSection() }
-                    } else {
-                        items(categoryGroupedList) { group ->
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White,
-                                shadowElevation = 1.dp,
-                                onClick = {
-                                    if (group.transactionCount > 1) {
-                                        navController.navigate("grouped_expense/${group.category.title}/${group.totalAmount}")
-                                    } else {
-                                        navController.navigate("detail_expense/${group.singleId}")
-                                    }
+
+                        if (isLoading) {
+                            item {
+                                Box(Modifier.fillMaxWidth().padding(50.dp), Alignment.Center) {
+                                    CircularProgressIndicator(color = themeColor)
                                 }
-                            ) {
-                                ExpenseItem(
-                                    title = group.category.title,
-                                    percent = "${group.transactionCount} giao dịch (${String.format("%.1f", group.percentage)}%)",
-                                    amount = "${if (selectedType == "CHI PHÍ") "-" else "+"} ${String.format("%,.0f", group.totalAmount)} $",
-                                    color = Color(android.graphics.Color.parseColor(group.category.colorHex))
-                                )
+                            }
+                        } else if (categoryGroupedList.isEmpty()) {
+                            item { EmptyStateSection() }
+                        } else {
+                            items(categoryGroupedList) { group ->
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color.White,
+                                    shadowElevation = 1.dp,
+                                    onClick = {
+                                        if (group.transactionCount > 1) {
+                                            navController.navigate("grouped_expense/${group.category.title}/${group.totalAmount}")
+                                        } else {
+                                            navController.navigate("detail_expense/${group.singleId}")
+                                        }
+                                    }
+                                ) {
+                                    ExpenseItem(
+                                        title = group.category.title,
+                                        percent = "${group.transactionCount} giao dịch (${String.format("%.1f", group.percentage)}%)",
+                                        amount = "${if (selectedType == "CHI PHÍ") "-" else "+"} ${String.format("%,.0f", group.totalAmount)} đ",
+                                        color = Color(android.graphics.Color.parseColor(group.category.colorHex))
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                // Lớp biểu đồ Morphing
-                Surface(
-                    modifier = Modifier.fillMaxWidth().height(dynamicChartHeight),
-                    color = Color(0xFFF8F9FA),
-                    shadowElevation = (morphProgress * 4).dp
-                ) {
-                    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
-                        if (morphProgress < 0.6f && chartData.isNotEmpty()) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = 1f - morphProgress * 2.5f }) {
-                                Text("Tổng cộng", fontSize = 11.sp, color = Color.Gray)
-                                Text(text = "${String.format("%,.0f", chartData.sumOf { it.totalAmount })} $", fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    // Morphing Canvas
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().height(dynamicChartHeight),
+                        color = Color(0xFFF8F9FA),
+                        shadowElevation = (morphProgress * 4).dp
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
+                            if (morphProgress < 0.6f && chartData.isNotEmpty()) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = 1f - morphProgress * 2.5f }) {
+                                    Text("Tổng cộng", fontSize = 11.sp, color = Color.Gray)
+                                    Text(text = "${String.format("%,.0f", chartData.sumOf { it.totalAmount })} đ", fontSize = 18.sp, fontWeight = FontWeight.Black)
+                                }
                             }
+                            if (chartData.isNotEmpty()) { MorphingCanvas(chartData, morphProgress) }
                         }
-                        if (morphProgress > 0.8f) {
-                            Row(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Phân bổ chi tiêu", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                                Text("${String.format("%,.0f", chartData.sumOf { it.totalAmount })} $", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        if (chartData.isNotEmpty()) { MorphingCanvas(chartData, morphProgress) }
                     }
                 }
             }
-        }
 
-        FloatingActionButton(
-            onClick = { navController.navigate("add") },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-            containerColor = Color(0xFFFFC107),
-            shape = CircleShape
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Thêm", tint = Color.White)
+            FloatingActionButton(
+                onClick = { navController.navigate("add") },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+                containerColor = Color(0xFFFFC107),
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Thêm", tint = Color.White)
+            }
         }
     }
 }
 
+@Composable
+fun HeaderSection(
+    selectedType: String,
+    totalBalance: Double,
+    onTabSelected: (String) -> Unit,
+    navController: NavController,
+    onMenuClick: () -> Unit // Thêm tham số callback
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            // GỌI CALLBACK KHI NHẤN MENU
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, null, tint = Color.White)
+            }
+//            IconButton(onClick = { navController.navigate("history_all") }) {
+//                Icon(Icons.Default.List, null, tint = Color.White)
+//            }
+        }
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("TỔNG SỐ DƯ", color = Color.White.copy(0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "${String.format("%,.0f", totalBalance)} đ", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Box(modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(0.12f)).padding(4.dp)) {
+            Row {
+                listOf("CHI PHÍ", "THU NHẬP").forEach { title ->
+                    val isSelected = selectedType == title
+                    Box(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.2f) else Color.Transparent).clickable { onTabSelected(title) }.padding(horizontal = 28.dp, vertical = 10.dp)) {
+                        Text(text = title, color = if (isSelected) Color.White else Color.White.copy(0.5f), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
 @Composable
 fun TimeNavigationHeader(
     viewModel: HistoryViewModel,
@@ -372,35 +517,7 @@ fun MorphingCanvas(chartData: List<ChartData>, progress: Float) {
     }
 }
 
-@Composable
-fun HeaderSection(
-    selectedType: String,
-    totalBalance: Double,
-    onTabSelected: (String) -> Unit,
-    navController: NavController
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            IconButton(onClick = { /* Menu */ }) { Icon(Icons.Default.Menu, null, tint = Color.White) }
-            IconButton(onClick = { navController.navigate("history_all") }) { Icon(Icons.Default.List, null, tint = Color.White) }
-        }
-        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("TỔNG SỐ DƯ", color = Color.White.copy(0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            Text(text = "${String.format("%,.0f", totalBalance)} $", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-        Box(modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(0.12f)).padding(4.dp)) {
-            Row {
-                listOf("CHI PHÍ", "THU NHẬP").forEach { title ->
-                    val isSelected = selectedType == title
-                    Box(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.2f) else Color.Transparent).clickable { onTabSelected(title) }.padding(horizontal = 28.dp, vertical = 10.dp)) {
-                        Text(text = title, color = if (isSelected) Color.White else Color.White.copy(0.5f), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
 fun EmptyStateSection() {

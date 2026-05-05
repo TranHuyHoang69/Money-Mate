@@ -1,5 +1,8 @@
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -7,7 +10,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.moneymate.ui.navigation.Screen
+import com.example.moneymate.ui.screen.AddCategoryScreen
 import com.example.moneymate.ui.screen.AddScreen
+import com.example.moneymate.ui.screen.CategoryManagementScreen
 import com.example.moneymate.ui.screen.DetailExpenseScreen
 import com.example.moneymate.ui.screen.DetailListScreen
 import com.example.moneymate.ui.screen.GroupedExpenseScreen
@@ -15,6 +20,8 @@ import com.example.moneymate.ui.screen.HomeScreen
 import com.example.moneymate.ui.screen.LoginScreen
 import com.example.moneymate.ui.screen.RegisterScreen
 import com.example.moneymate.ui.screen.UpdateScreen
+import com.example.moneymate.viewmodel.AuthViewModel
+import com.example.moneymate.viewmodel.CategoryViewModel
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.HomeViewModel
 
@@ -25,6 +32,19 @@ fun AppNavigation() {
     // Khởi tạo các ViewModel ở cấp cao nhất để quản lý trạng thái chung (như ngày tháng được chọn)
     val homeViewModel: HomeViewModel = hiltViewModel()
     val historyViewModel: HistoryViewModel = hiltViewModel()
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authUiState by authViewModel.uiState.collectAsState()
+
+    LaunchedEffect(authUiState.isLoggedIn) {
+        if (!authUiState.isLoggedIn) {
+            navController.navigate(Screen.Login.route) {
+                // popUpTo(0) sẽ xóa sạch TẤT CẢ các màn hình đang có trong stack
+                // Người dùng không thể nhấn nút Back để quay lại Home
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -108,6 +128,36 @@ fun AppNavigation() {
         ) { backStackEntry ->
             val id = backStackEntry.arguments?.getLong("expenseId") ?: -1L
             UpdateScreen(navController = navController, expenseId = id)
+        }
+
+        composable(
+            route = "add_category/{type}", // Thống nhất tên route
+            arguments = listOf(navArgument("type") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val type = backStackEntry.arguments?.getString("type") ?: "SPEND"
+            val categoryViewModel: CategoryViewModel = hiltViewModel()
+
+            AddCategoryScreen(
+                initialType = type,
+                onBack = { navController.popBackStack() },
+                onSave = { entity ->
+                    categoryViewModel.insertCategory(entity)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = "category_management/{type}",
+            arguments = listOf(navArgument("type") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val type = backStackEntry.arguments?.getString("type") ?: "SPEND"
+
+            // TRUYỀN ĐÚNG TÊN THAM SỐ LÀ navController
+            CategoryManagementScreen(
+                navController = navController, // "navController" này lấy từ scope của NavHost
+                type = type
+            )
         }
     }
 }

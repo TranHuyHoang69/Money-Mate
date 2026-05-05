@@ -9,4 +9,6 @@ sealed class Screen(val route: String){
     object DetailExpense : Screen("detail_expense/{expenseId}")
     object Update: Screen("update/{expenseId}")
     object GroupedExpense : Screen("grouped_expense/{categoryName}/{totalAmount}")
+    object AddCategory: Screen("add_category/{type}")
+    object CategoryManagement: Screen("category_management/{type}")
 }
