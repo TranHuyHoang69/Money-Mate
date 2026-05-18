@@ -34,20 +34,21 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
+import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.viewmodel.AddExpenseEvent
 import com.example.moneymate.viewmodel.AddExpenseViewModel
 
 @Composable
@@ -56,21 +57,25 @@ fun UpdateScreen(
     expenseId: Long = -1L,
     viewModel: AddExpenseViewModel = hiltViewModel()
 ) {
-    // Tự động load dữ liệu khi vào màn hình
+    // 1. Tự động load dữ liệu thông qua Event khi vào màn hình
     LaunchedEffect(expenseId) {
         if (expenseId != -1L) {
-            viewModel.loadExpenseDetails(expenseId)
+            viewModel.onEvent(AddExpenseEvent.LoadDetails(expenseId))
         }
     }
 
-    val categoriesState by viewModel.categories.collectAsState()
-    val themeColor = if (viewModel.selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    // 2. Lấy UI State duy nhất từ ViewModel
+    val state = viewModel.uiState
+
+    // 3. Xác định màu chủ đạo dựa trên TransactionType (Enum)
+    val themeColor = if (state.selectedType == TransactionType.SPEND)
+        Color(0xFF4B8361) else Color(0xFF2E5B8B)
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F9FA))) {
         HeaderUpdate(
             themeColor = themeColor,
-            selectedType = viewModel.selectedType,
-            onTabSelected = { viewModel.selectedType = it },
+            selectedType = state.selectedType,
+            onTabSelected = { viewModel.onEvent(AddExpenseEvent.ChangeType(it)) },
             onBack = { navController.popBackStack() },
             isEditMode = expenseId != -1L
         )
@@ -78,7 +83,6 @@ fun UpdateScreen(
         FormSectionUpdate(
             viewModel = viewModel,
             themeColor = themeColor,
-            categoriesState = categoriesState,
             onSuccess = { navController.popBackStack() }
         )
     }
@@ -87,8 +91,8 @@ fun UpdateScreen(
 @Composable
 fun HeaderUpdate(
     themeColor: Color,
-    selectedType: String,
-    onTabSelected: (String) -> Unit,
+    selectedType: TransactionType,
+    onTabSelected: (TransactionType) -> Unit,
     onBack: () -> Unit,
     isEditMode: Boolean
 ) {
@@ -113,6 +117,7 @@ fun HeaderUpdate(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Tab chọn Chi phí / Thu nhập
         Row(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -120,13 +125,13 @@ fun HeaderUpdate(
                 .background(Color.Black.copy(0.15f))
                 .padding(4.dp)
         ) {
-            listOf("CHI PHÍ", "THU NHẬP").forEach { title ->
-                val isSelected = selectedType == title
+            listOf(TransactionType.SPEND to "CHI PHÍ", TransactionType.INCOME to "THU NHẬP").forEach { (type, title) ->
+                val isSelected = selectedType == type
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSelected) Color.White.copy(0.25f) else Color.Transparent)
-                        .clickable { onTabSelected(title) }
+                        .clickable { onTabSelected(type) }
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -144,9 +149,10 @@ fun HeaderUpdate(
 fun FormSectionUpdate(
     viewModel: AddExpenseViewModel,
     themeColor: Color,
-    categoriesState: Result<List<Category>>,
     onSuccess: () -> Unit
 ) {
+    val state = viewModel.uiState
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
@@ -154,12 +160,12 @@ fun FormSectionUpdate(
         item {
             Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             OutlinedTextField(
-                value = viewModel.amount,
-                onValueChange = { viewModel.onAmountChange(it) },
+                value = state.amount,
+                onValueChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, color = themeColor),
                 placeholder = { Text("0.00", color = Color.LightGray) },
-                trailingIcon = { Text("$", fontWeight = FontWeight.Bold, color = themeColor) },
+                trailingIcon = { Text("₫", fontWeight = FontWeight.Bold, color = themeColor) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 shape = RoundedCornerShape(16.dp)
             )
@@ -167,21 +173,27 @@ fun FormSectionUpdate(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            when (categoriesState) {
+            when (val categoriesResult = state.categories) {
                 is Result.Success -> {
                     CategoryGridUpdate(
-                        categories = categoriesState.data,
+                        categories = categoriesResult.data,
                         themeColor = themeColor,
-                        selectedCategory = viewModel.selectedCategory,
-                        onCategorySelect = { viewModel.selectedCategory = it }
+                        selectedCategory = state.selectedCategory,
+                        onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) }
                     )
                 }
-                else -> { CircularProgressIndicator(modifier = Modifier.padding(16.dp)) }
+                is Result.Loading -> {
+                    Box(Modifier.fillMaxWidth().height(100.dp), Alignment.Center) {
+                        CircularProgressIndicator(color = themeColor)
+                    }
+                }
+                is Result.Error -> {
+                    Text("Lỗi: ${categoriesResult.message}", color = Color.Red)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Phần Ghi chú
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -190,8 +202,8 @@ fun FormSectionUpdate(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Ghi chú", color = Color.Gray, fontSize = 12.sp)
                     OutlinedTextField(
-                        value = viewModel.note,
-                        onValueChange = { viewModel.note = it },
+                        value = state.note,
+                        onValueChange = { viewModel.onEvent(AddExpenseEvent.ChangeNote(it)) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
@@ -204,7 +216,7 @@ fun FormSectionUpdate(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { viewModel.saveExpense(onSuccess) },
+                onClick = { viewModel.onEvent(AddExpenseEvent.Save(onSuccess)) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor)
@@ -222,14 +234,14 @@ fun CategoryGridUpdate(
     selectedCategory: Category?,
     onCategorySelect: (Category) -> Unit
 ) {
-    // Tính toán chiều cao dựa trên số lượng category để không bị lỗi scroll trong LazyColumn
     val rows = (categories.size + 3) / 4
-    val gridHeight = (rows * 100).dp
+    val gridHeight = (rows * 90).dp // Giảm chiều cao một chút cho cân đối
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
         modifier = Modifier.heightIn(max = gridHeight),
-        userScrollEnabled = false
+        userScrollEnabled = false,
+        contentPadding = PaddingValues(vertical = 8.dp)
     ) {
         items(categories) { category ->
             val isSelected = selectedCategory?.id == category.id
@@ -266,6 +278,6 @@ fun CategoryItemUpdate(
                 tint = if (isSelected) Color.White else themeColor
             )
         }
-        Text(category.title, fontSize = 10.sp, maxLines = 1)
+        Text(category.title, fontSize = 10.sp, maxLines = 1, textAlign = TextAlign.Center)
     }
 }

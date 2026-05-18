@@ -8,8 +8,10 @@ import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.repository.ExpenseRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import javax.inject.Inject
@@ -32,7 +34,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         expenseDao.getExpensesWithCategoryByPeriod(start, end).map { list ->
             val domainList = list.map { it.toDomain() }
             Result.Success(domainList) as Result<List<Expense>>
-        }.onStart { emit(Result.Loading) }
+        }.flowOn(Dispatchers.IO)
+            .onStart { emit(Result.Loading) }
             .catch { emit(Result.Error(it.message ?: "Error")) }
 
     // 3. Implement getExpenseById
@@ -41,6 +44,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             .map{entity ->
                 Result.Success(entity?.toDomain()) as Result<Expense?>
             }
+            .flowOn(Dispatchers.IO)
             .catch { emit(Result.Error(it.message ?: "Error")) }
 
     // 4. Phải khớp tên "getAllCategories"
@@ -48,12 +52,14 @@ class ExpenseRepositoryImpl @Inject constructor(
         categoryDao.getAllCategories().map { list ->
             val domainList = list.map { it.toDomain() }
             Result.Success(domainList) as Result<List<Category>>
-        }.onStart { emit(Result.Loading) }
+        }
+            .flowOn(Dispatchers.IO)
+            .onStart { emit(Result.Loading) }
             .catch { emit(Result.Error(it.message ?: "Error")) }
     override fun getCategoriesByType(type: String): Flow<Result<List<Category>>> =
         categoryDao.getCategoriesByType(type).map { list ->
             Result.Success(list.map { it.toDomain() }) as Result<List<Category>>
-        }.onStart { emit(Result.Loading) }.catch { emit(Result.Error(it.message ?: "Error")) }
+        }.flowOn(Dispatchers.IO).onStart { emit(Result.Loading) }.catch { emit(Result.Error(it.message ?: "Error")) }
 
     // --- Các hàm suspend khác giữ nguyên logic try-catch như hôm trước ---
     override suspend fun insertExpense(expense: Expense) = try {

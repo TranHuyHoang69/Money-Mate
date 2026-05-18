@@ -1,9 +1,10 @@
 package com.example.moneymate.data.repository
 
+import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.User
 import com.example.moneymate.domain.repository.AuthRepository
-import com.example.moneymate.domain.Result
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -77,5 +78,16 @@ class AuthRepositoryImpl @Inject constructor(
         }
         auth.addAuthStateListener(listener)
         awaitClose { auth.removeAuthStateListener(listener) }
+    }
+
+    override suspend fun signInWithGoogle(idToken: String): Result<Boolean> {
+        return try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            // firebaseAuth được inject vào Repository này từ DatabaseModule
+            auth.signInWithCredential(credential).await()
+            Result.Success(true)
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Lỗi xác thực Google")
+        }
     }
 }

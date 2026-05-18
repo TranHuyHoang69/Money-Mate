@@ -11,5 +11,6 @@ interface AuthRepository{
     suspend fun loginWithEmail(email: String, password: String): com.example.moneymate.domain.Result<User>
     suspend fun registerWithEmail(email: String, userName: String, password: String): com.example.moneymate.domain.Result<User>
     suspend fun logout(): Result<Unit>
+    suspend fun signInWithGoogle(idToken: String): Result<Boolean>
     fun observeAuthState(): Flow<User?>
 }

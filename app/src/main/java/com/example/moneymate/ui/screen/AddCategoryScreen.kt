@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.moneymate.data.local.CategoryEntity
 import com.example.moneymate.ui.item.IconItem
 import com.example.moneymate.ui.utils.IconUtils
@@ -61,8 +64,13 @@ fun AddCategoryScreen(
     }
 
     val colors = listOf("#4B8361", "#2E5B8B", "#FFC107", "#E91E63", "#9C27B0", "#00BCD4", "#FF5722", "#795548", "#607D8B", "#8BC34A", "#3F51B5", "#FF9800")
-    val currentColor = Color(android.graphics.Color.parseColor(selectedColor))
-
+    val currentColor = remember(selectedColor) {
+        try {
+            Color(android.graphics.Color.parseColor(selectedColor))
+        } catch (e: Exception) {
+            Color(0xFF4B8361)
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Danh mục mới") }, navigationIcon = {
@@ -104,16 +112,30 @@ fun AddCategoryScreen(
             }
 
             Text("Biểu tượng", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-            LazyColumn(modifier = Modifier.weight(1f)) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(5),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
                 groupedIcons.forEach { (groupName, iconsInGroup) ->
-                    item {
-                        Text(groupName, color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
-                        iconsInGroup.chunked(5).forEach { rowIcons ->
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                rowIcons.forEach { icon ->
-                                    IconItem(icon, selectedIcon == icon, currentColor) { selectedIcon = icon }
-                                }
-                            }
+                    // Header của nhóm icon
+                    item(span = { GridItemSpan(5) }) {
+                        Text(
+                            groupName,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    // Danh sách icon trong nhóm
+                    items(iconsInGroup) { icon ->
+                        IconItem(
+                            iconName = icon,
+                            isSelected = selectedIcon == icon,
+                            tintColor = currentColor
+                        ) {
+                            selectedIcon = icon
                         }
                     }
                 }

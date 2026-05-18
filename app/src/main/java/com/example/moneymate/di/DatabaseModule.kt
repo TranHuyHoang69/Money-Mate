@@ -14,6 +14,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Singleton
 
 @Module
@@ -28,21 +31,26 @@ object DatabaseModule {
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
-                    insertDefaultData(db)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        insertDefaultData(db)
+                    }
                 }
 
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     super.onOpen(db)
                     // Kiểm tra xem đã có dữ liệu chưa, nếu chưa có (count = 0) thì mới chèn
                     // Điều này giúp dữ liệu luôn hiện kể cả khi bạn nâng cấp version (Migration)
-                    val cursor = db.query("SELECT COUNT(*) FROM categories")
-                    if (cursor.moveToFirst()) {
-                        val count = cursor.getInt(0)
-                        if (count == 0) {
-                            insertDefaultData(db)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val cursor = db.query("SELECT COUNT(*) FROM categories")
+                        if (cursor.moveToFirst()) {
+                            val count = cursor.getInt(0)
+                            if (count == 0) {
+                                insertDefaultData(db)
+                            }
                         }
+                        cursor.close()
                     }
-                    cursor.close()
+
                 }
             })
             .build()
@@ -50,10 +58,15 @@ object DatabaseModule {
 
     // Tách hàm chèn dữ liệu ra riêng cho sạch
     private fun insertDefaultData(db: SupportSQLiteDatabase) {
-        db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Ăn uống', 'ic_food', '#FF5733', 'SPEND', 1)")
-        db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Mua sắm', 'ic_shop', '#3357FF', 'SPEND', 1)")
-        db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Lương', 'ic_money', '#FFD700', 'INCOME', 1)")
-        db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Di chuyển', 'ic_car', '#4CAF50', 'SPEND', 1)")
+        try {
+            db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Ăn uống', 'ic_food', '#FF5733', 'SPEND', 1)")
+            db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Mua sắm', 'ic_shop', '#3357FF', 'SPEND', 1)")
+            db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Lương', 'ic_money', '#FFD700', 'INCOME', 1)")
+            db.execSQL("INSERT INTO categories (title, iconResName, colorHex, type, isDefault) VALUES ('Di chuyển', 'ic_car', '#4CAF50', 'SPEND', 1)")
+        }catch (e: Exception){
+            e.printStackTrace()
+        }
+
     }
     @Provides
     fun provideExpenseDao(db: AppDatabase): ExpenseDao = db.expenseDao()

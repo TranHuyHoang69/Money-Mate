@@ -13,7 +13,11 @@ fun CategoryEntity.toDomain(): Category {
         title = this.title,
         iconResName = this.iconResName,
         colorHex = this.colorHex,
-        type = this.type,    // Map từ Entity sang Domain
+        type = try {
+            TransactionType.valueOf(this.type)
+        } catch (e: Exception) {
+            TransactionType.SPEND
+        },
         isDefault = this.isDefault
     )
 }
@@ -24,7 +28,7 @@ fun Category.toEntity(): CategoryEntity {
         title = this.title,
         iconResName = this.iconResName,
         colorHex = this.colorHex,
-        type = this.type,    // Map từ Domain sang Entity (Hết lỗi tại đây)
+        type = this.type.name,    // Map từ Domain sang Entity (Hết lỗi tại đây)
         isDefault = this.isDefault
     )
 }

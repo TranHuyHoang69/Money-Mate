@@ -29,26 +29,14 @@ import com.example.moneymate.viewmodel.HomeViewModel
 fun AppNavigation() {
     val navController = rememberNavController()
 
-    // Khởi tạo các ViewModel ở cấp cao nhất để quản lý trạng thái chung (như ngày tháng được chọn)
-    val homeViewModel: HomeViewModel = hiltViewModel()
-    val historyViewModel: HistoryViewModel = hiltViewModel()
+    // Chỉ giữ AuthViewModel ở đây để check trạng thái Login toàn cục
     val authViewModel: AuthViewModel = hiltViewModel()
     val authUiState by authViewModel.uiState.collectAsState()
 
-    LaunchedEffect(authUiState.isLoggedIn) {
-        if (!authUiState.isLoggedIn) {
-            navController.navigate(Screen.Login.route) {
-                // popUpTo(0) sẽ xóa sạch TẤT CẢ các màn hình đang có trong stack
-                // Người dùng không thể nhấn nút Back để quay lại Home
-                popUpTo(0) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = Screen.MainScreen.route
     ) {
         // --- LOGIN & REGISTER ---
         composable(Screen.Login.route) {
@@ -61,10 +49,14 @@ fun AppNavigation() {
 
         // --- MAIN SCREEN ---
         composable(Screen.MainScreen.route) {
+            // Chỉ khởi tạo ViewModel khi người dùng đã vào Home
+            val homeViewModel: HomeViewModel = hiltViewModel()
+            val historyViewModel: HistoryViewModel = hiltViewModel()
             HomeScreen(
                 navController = navController,
                 historyViewModel = historyViewModel,
-                homeViewModel = homeViewModel
+                homeViewModel = homeViewModel,
+                authViewModel = authViewModel
             )
         }
 
@@ -78,35 +70,42 @@ fun AppNavigation() {
                 }
             )
         ) {
-            AddScreen(navController = navController)
+            if(authUiState.isLoggedIn){
+                AddScreen(navController = navController)
+            }else{
+                LaunchedEffect(Unit) {navController.navigate(Screen.Login.route) }
+            }
         }
 
-        // --- DETAIL LIST (Danh sách phẳng) ---
-        // Trong AppNavigation.kt
-        composable("history_all") { // Đặt tên route đơn giản thôi
+        // --- DETAIL LIST ---
+        composable("history_all") {
+            val historyViewModel: HistoryViewModel = hiltViewModel()
             DetailListScreen(
                 navController = navController,
                 historyViewModel = historyViewModel,
-                categoryId = 0L,        // Mặc định 0L là xem "Tất cả"
-                categoryName = "Lịch sử", // Tên hiển thị trên Header
-                type = "CHI PHÍ"         // Tab mặc định khi mới mở
+                categoryId = 0L,
+                categoryName = "Lịch sử",
+                type = "CHI PHÍ"
             )
         }
 
-        // --- GROUPED EXPENSE (Màn hình gộp theo ngày bạn vừa yêu cầu) ---
+        // --- GROUPED EXPENSE ---
         composable(
             route = Screen.GroupedExpense.route,
             arguments = listOf(
                 navArgument("categoryName") { type = NavType.StringType },
-                navArgument("totalAmount") { type = NavType.StringType } // Truyền String để Double dễ parse
+                navArgument("totalAmount") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val name = backStackEntry.arguments?.getString("categoryName") ?: ""
             val total = backStackEntry.arguments?.getString("totalAmount")?.toDoubleOrNull() ?: 0.0
 
+            // ViewModel này sẽ được giải phóng khi thoát màn hình này
+            val historyViewModel: HistoryViewModel = hiltViewModel()
+
             GroupedExpenseScreen(
                 navController = navController,
-                historyViewModel = historyViewModel, // Dùng chung để đồng bộ ngày tháng
+                historyViewModel = historyViewModel,
                 categoryName = name,
                 totalAmount = total
             )
@@ -130,8 +129,9 @@ fun AppNavigation() {
             UpdateScreen(navController = navController, expenseId = id)
         }
 
+        // --- ADD CATEGORY ---
         composable(
-            route = "add_category/{type}", // Thống nhất tên route
+            route = "add_category/{type}",
             arguments = listOf(navArgument("type") { type = NavType.StringType })
         ) { backStackEntry ->
             val type = backStackEntry.arguments?.getString("type") ?: "SPEND"
@@ -147,15 +147,14 @@ fun AppNavigation() {
             )
         }
 
+        // --- CATEGORY MANAGEMENT ---
         composable(
             route = "category_management/{type}",
             arguments = listOf(navArgument("type") { type = NavType.StringType })
         ) { backStackEntry ->
             val type = backStackEntry.arguments?.getString("type") ?: "SPEND"
-
-            // TRUYỀN ĐÚNG TÊN THAM SỐ LÀ navController
             CategoryManagementScreen(
-                navController = navController, // "navController" này lấy từ scope của NavHost
+                navController = navController,
                 type = type
             )
         }

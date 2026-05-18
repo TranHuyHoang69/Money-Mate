@@ -84,7 +84,10 @@ fun DetailListScreen(
         initialSelectedStartDateMillis = System.currentTimeMillis()
     )
 
-    val themeColor = if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    // SỬA Dòng 93: Dùng remember để tránh tính toán lại màu vô ích
+    val themeColor = remember(selectedType) {
+        if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    }
 
     // Logic lọc danh sách
     val filteredList = remember(expensesByPeriod, selectedType, categoryId) {
@@ -96,7 +99,10 @@ fun DetailListScreen(
         }
     }
 
-    val totalAmount = filteredList.sumOf { it.amount }
+    // SỬA Dòng 106: Dùng remember để tránh duyệt danh sách tính tổng mỗi khi recompose
+    val totalAmount = remember(filteredList) {
+        filteredList.sumOf { it.amount }
+    }
 
     // --- DIALOG CHỌN KHOẢNG THỜI GIAN ---
     if (showDatePicker) {

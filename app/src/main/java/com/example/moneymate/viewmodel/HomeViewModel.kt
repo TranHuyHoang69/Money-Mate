@@ -1,6 +1,5 @@
 package com.example.moneymate.viewmodel
 
-import android.icu.util.Calendar
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,11 +10,17 @@ import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.domain.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Calendar
 import javax.inject.Inject
 
 data class ChartData(
@@ -41,11 +46,14 @@ class HomeViewModel @Inject constructor(
 
 
     init {
-        loadAllExpenses()
+        viewModelScope.launch(Dispatchers.Main) {
+            delay(300)
+            loadAllExpenses()
+        }
     }
 
      fun loadAllExpenses() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.getAllExpenses().collect { result ->
                 _expensesState.value = result
             }
@@ -69,32 +77,37 @@ class HomeViewModel @Inject constructor(
     }
 
     // Trong getChartData (HomeViewModel)
-    fun getChartData(selectedType: String): Flow<List<ChartData>> = _expensesState.map { result ->
-        if(result is Result.Success){
-            val typeEnum = if(selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
-            val range = getTimeRange(selectedPeriod) // Lấy khoảng thời gian đang chọn
+    // Sửa hàm getChartData trong HomeViewModel.kt
+    fun getChartData(selectedType: String): Flow<List<ChartData>> = expensesState
+        .map { result ->
+            if (result is Result.Success) {
+                // Thực hiện tính toán nặng trên luồng Default (luồng tính toán)
+                withContext(Dispatchers.Default) {
+                    val typeEnum = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+                    val range = getTimeRange(selectedPeriod)
 
-            // Lọc cả LOẠI và THỜI GIAN
-            val filtered = result.data.filter {
-                it.type == typeEnum && it.timestamp >= range.first && it.timestamp <= range.second
-            }
+                    val filtered = result.data.filter {
+                        it.type == typeEnum && it.timestamp >= range.first && it.timestamp <= range.second
+                    }
 
-            val total = filtered.sumOf { it.amount }
-            if(total == 0.0) return@map emptyList()
+                    val total = filtered.sumOf { it.amount }
+                    if (total == 0.0) return@withContext emptyList<ChartData>()
 
-            filtered.groupBy { it.category.id }
-                .map { (_, items) ->
-                    val catTotal = items.sumOf { it.amount }
-                    val category = items.first().category
-                    ChartData(
-                        categoryName = category.title,
-                        totalAmount = catTotal,
-                        percentage = ((catTotal/total)*100).toFloat(),
-                        color = category.colorHex
-                    )
-                }.sortedByDescending { it.totalAmount }
-        } else emptyList()
-    }
+                    filtered.groupBy { it.category.id }
+                        .map { (_, items) ->
+                            val catTotal = items.sumOf { it.amount }
+                            val category = items.first().category
+                            ChartData(
+                                categoryName = category.title,
+                                totalAmount = catTotal,
+                                percentage = ((catTotal / total) * 100).toFloat(),
+                                color = category.colorHex
+                            )
+                        }.sortedByDescending { it.totalAmount }
+                }
+            } else emptyList()
+        }.flowOn(Dispatchers.Default) // Đảm bảo toàn bộ chuỗi Flow chạy trên Default
+        .distinctUntilChanged()
 
     // Hàm logic tính tổng số dư
     fun calculateTotalBalance(expenses: List<Expense>): Double {
@@ -146,7 +159,7 @@ class HomeViewModel @Inject constructor(
             }
             list
         } else emptyList()
-    }
+    }.flowOn(Dispatchers.Default)
 
     fun moveTimeRange(delta: Int) {
         val newCalendar = currentCalendar.clone() as Calendar

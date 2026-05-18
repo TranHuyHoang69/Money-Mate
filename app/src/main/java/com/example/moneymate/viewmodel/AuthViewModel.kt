@@ -1,10 +1,15 @@
 package com.example.moneymate.viewmodel
 
+import android.content.Context
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.User
 import com.example.moneymate.domain.repository.AuthRepository
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AuthUiState(
@@ -24,7 +30,8 @@ data class AuthUiState(
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val credentialManager: CredentialManager
 ): ViewModel(){
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState
@@ -34,15 +41,17 @@ class AuthViewModel @Inject constructor(
     }
 
     private fun observeAuthState() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             // Flow từ Firebase đã chạy trên worker thread của nó,
             // ta chỉ cần đảm bảo việc thu thập không chặn Main Thread.
             authRepository.observeAuthState().collectLatest { user ->
-                _uiState.update { it.copy(
-                    user = user,
-                    isLoggedIn = user != null,
-                    isLoading = false
-                )}
+                withContext(Dispatchers.Main){
+                    _uiState.update { it.copy(
+                        user = user,
+                        isLoggedIn = user != null,
+                        isLoading = false
+                    )}
+                }
             }
         }
     }
@@ -97,6 +106,38 @@ class AuthViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Lỗi khi đăng xuất: ${e.message}") }
+            }
+        }
+    }
+
+    // Trong AuthViewModel.kt
+    fun signInWithGoogle(context: Context) {
+        // LƯU Ý: CredentialManager.getCredential() VẪN cần Activity Context
+        // để hiển thị hộp thoại chọn tài khoản (Bottom Sheet).
+        // Nhưng việc khởi tạo instance Manager đã được Hilt lo.
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId("your_server_client_id")
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                // Sử dụng instance đã được inject
+                val result = credentialManager.getCredential(context, request)
+
+                // Xử lý tiếp token...
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                authRepository.signInWithGoogle(googleIdTokenCredential.idToken)
+
+                _uiState.update { it.copy(isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Lỗi đăng nhập") }
             }
         }
     }
