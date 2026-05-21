@@ -46,9 +46,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +67,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Expense
+import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.chart.MorphingChartSection
 import com.example.moneymate.ui.item.ExpenseItem
 import com.example.moneymate.ui.navigation.Screen
@@ -73,7 +77,9 @@ import com.example.moneymate.viewmodel.CalendarMode
 import com.example.moneymate.viewmodel.ChartData
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.HomeViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CategoryGroup(
     val category: com.example.moneymate.domain.model.Category,
@@ -82,6 +88,7 @@ data class CategoryGroup(
     val percentage: Float,
     val singleId: Long
 )
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -96,64 +103,84 @@ fun HomeScreen(
     val allExpensesResult by homeViewModel.expensesState.collectAsState()
     val authUiState by authViewModel.uiState.collectAsState()
 
+    LaunchedEffect(authUiState.isLoggedIn) {
+        android.util.Log.d("HomeScreen", "Auth state changed: ${authUiState.isLoggedIn}")
+        homeViewModel.reloadExpenses()
+    }
+
+    LaunchedEffect(authUiState.isLoggedIn) {
+        android.util.Log.d("HomeScreen", "Auth changed: ${authUiState.isLoggedIn}")
+        historyViewModel.loadData()  // Force reload HistoryViewModel
+        homeViewModel.reloadExpenses()
+    }
+
     // --- UI State ---
     val scrollState = rememberLazyListState()
     var selectedType by remember { mutableStateOf("CHI PHÍ") }
-    val themeColor = if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    val themeColor = remember(selectedType) {
+        if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // --- Date Picker State ---
     var showDatePicker by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
 
-    // --- Logic Tính Toán Số Dư (Nên đưa vào ViewModel nhưng tối ưu tạm bằng remember) ---
-    val totalBalance = remember(allExpensesResult) {
-        if (allExpensesResult is Result.Success) {
-            homeViewModel.calculateTotalBalance((allExpensesResult as Result.Success<List<Expense>>).data)
-        } else 0.0
+    // --- State sau tối ưu (Chạy dưới nền) ---
+    var totalBalance by remember { mutableDoubleStateOf(0.0) }
+    var categoryGroupedList by remember { mutableStateOf<List<CategoryGroup>>(emptyList()) }
+    var chartData by remember { mutableStateOf<List<ChartData>>(emptyList()) }
+
+// 1. Xử lý tính toán tổng số dư dưới luồng nền khi allExpensesResult thay đổi
+    LaunchedEffect(allExpensesResult, authUiState.isLoggedIn) {  // ← Thêm authUiState.isLoggedIn
+        withContext(Dispatchers.Default) {
+            if (allExpensesResult is Result.Success) {
+                homeViewModel.calculateTotalBalance((allExpensesResult as Result.Success<List<Expense>>).data)
+            } else 0.0
+        }?.let { totalBalance = it }
     }
 
-    // --- Logic Xử lý Danh sách (Loại bỏ Reflection) ---
-    val categoryGroupedList = remember(expensesByPeriod, selectedType) {
-        val typeEnum = if (selectedType == "CHI PHÍ")
-            com.example.moneymate.domain.model.TransactionType.SPEND
-        else
-            com.example.moneymate.domain.model.TransactionType.INCOME
+    // 2. Xử lý thuật toán map/group dữ liệu danh mục dưới luồng nền (Né chặn Main Thread)
+    LaunchedEffect(expensesByPeriod, selectedType) {
+        withContext(Dispatchers.Default) {
+            val typeEnum = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+            val filtered = expensesByPeriod.filter { it.type == typeEnum }
+            val totalAmountOfPeriod = filtered.sumOf { it.amount }
 
-        val filtered = expensesByPeriod.filter { it.type == typeEnum }
-        val totalAmountOfPeriod = filtered.sumOf { it.amount }
+            val groups = filtered.groupBy { it.category.id }.map { (_, items) ->
+                val firstItem = items.first()
+                val groupSum = items.sumOf { it.amount }
+                CategoryGroup(
+                    category = firstItem.category,
+                    totalAmount = groupSum,
+                    transactionCount = items.size,
+                    percentage = if (totalAmountOfPeriod > 0) (groupSum / totalAmountOfPeriod * 100).toFloat() else 0f,
+                    singleId = firstItem.id
+                )
+            }.sortedByDescending { it.totalAmount }
 
-        filtered.groupBy { it.category.id }.map { (_, items) ->
-            val firstItem = items.first()
-            val groupSum = items.sumOf { it.amount }
-            CategoryGroup(
-                category = firstItem.category,
-                totalAmount = groupSum,
-                transactionCount = items.size,
-                percentage = if (totalAmountOfPeriod > 0) (groupSum / totalAmountOfPeriod * 100).toFloat() else 0f,
-                singleId = firstItem.id
-            )
-        }.sortedByDescending { it.totalAmount }
-    }
-
-    // Dữ liệu cho Chart lấy trực tiếp từ CategoryGroup
-    val chartData = remember(categoryGroupedList) {
-        categoryGroupedList.map {
-            ChartData(it.category.title, it.totalAmount, it.percentage, it.category.colorHex)
+            val charts = groups.map {
+                ChartData(it.category.title, it.totalAmount, it.percentage, it.category.colorHex)
+            }
+            Pair(groups, charts)
+        }.let { (groups, charts) ->
+            categoryGroupedList = groups
+            chartData = charts
         }
     }
 
-    // --- Hiệu ứng Morphing ---
+    // 3. Cô lập tính toán tiến trình Morph động khi cuộn
     val morphProgress by remember {
         derivedStateOf {
-            if (scrollState.firstVisibleItemIndex > 0) 1f
-            else (scrollState.firstVisibleItemScrollOffset / 400f).coerceIn(0f, 1f)
+            if (scrollState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                (scrollState.firstVisibleItemScrollOffset / 400f).coerceIn(0f, 1f)
+            }
         }
     }
-    val dynamicChartHeight = (180 - (120 * morphProgress)).dp
+    val dynamicChartHeight = remember(morphProgress) { (180 - (120 * morphProgress)).dp }
 
-    // --- Date Picker Dialog ---
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -179,7 +206,8 @@ fun HomeScreen(
         }
     }
 
-    // --- UI STRUCTURE ---
+    val context = LocalContext.current
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -187,7 +215,8 @@ fun HomeScreen(
                 authUiState = authUiState,
                 totalBalance = totalBalance,
                 themeColor = themeColor,
-                onLogout = { authViewModel.logout() },
+                onLogout = { authViewModel.logout(context) },
+                context = context,
                 onNavigate = { route ->
                     scope.launch { drawerState.close() }
                     navController.navigate(route)
@@ -222,14 +251,18 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
                     ) {
-                        item { Spacer(modifier = Modifier.height(180.dp)) }
+                        item(contentType = "Spacer") { Spacer(modifier = Modifier.height(180.dp)) }
 
                         if (isLoading) {
-                            item { LoadingUI(themeColor) }
+                            item(contentType = "Loading") { LoadingUI(themeColor) }
                         } else if (categoryGroupedList.isEmpty()) {
-                            item { EmptyStateSection() }
+                            item(contentType = "Empty") { EmptyStateSection() }
                         } else {
-                            items(categoryGroupedList, key = { it.category.id }) { group ->
+                            items(
+                                items = categoryGroupedList,
+                                key = { it.category.id },
+                                contentType = { "ExpenseItem" }
+                            ) { group ->
                                 ExpenseListItem(
                                     group = group,
                                     selectedType = selectedType,
@@ -245,6 +278,7 @@ fun HomeScreen(
                         }
                     }
 
+                    // Khu vực Chart được bọc riêng để cập nhật mượt mà
                     MorphingChartSection(
                         chartData = chartData,
                         morphProgress = morphProgress,
@@ -266,13 +300,14 @@ fun HomeScreen(
             }
         }
     }
-}
 
+}
 @Composable
 fun HomeDrawerContent(
     authUiState: AuthUiState,
     totalBalance: Double,
     themeColor: Color,
+    context: android.content.Context,
     onLogout: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
@@ -302,7 +337,7 @@ fun HomeDrawerContent(
             selected = false,
             icon = { Icon(Icons.Default.History, null) },
             onClick = {
-                if(authUiState.isLoggedIn) onNavigate("history-all")
+                if(authUiState.isLoggedIn) onNavigate("history_all")
                 else onNavigate(Screen.Login.route)
             }
         )

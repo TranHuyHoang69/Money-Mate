@@ -1,5 +1,7 @@
 package com.example.moneymate.ui.screen
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +59,9 @@ import androidx.navigation.NavController
 import com.example.moneymate.R
 import com.example.moneymate.ui.navigation.Screen
 import com.example.moneymate.viewmodel.AuthViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,61 +70,67 @@ fun LoginScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+
+    // Đã chuyển State email và password xuống các Composable thành phần để cô lập Recomposition
+    var emailState by remember { mutableStateOf("") }
+    var passwordState by remember { mutableStateOf("") }
 
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
-    // Logic điều hướng: Khi isLoggedIn = true, đá sang Home và xóa sạch lịch sử
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        android.util.Log.d("GoogleAuth", "Activity result: ${result.resultCode}")
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            val account = task.getResult(ApiException::class.java)
+
+            android.util.Log.d("GoogleAuth", "Google sign-in successful: ${account.email}")
+            val idToken = account.idToken
+
+            if (idToken != null) {
+                android.util.Log.d("GoogleAuth", "ID Token obtained, signing in with Firebase...")
+                viewModel.signInWithFirebase(idToken)
+            } else {
+                android.util.Log.e("GoogleAuth", "No ID token received")
+            }
+        } catch (e: ApiException) {
+            android.util.Log.e("GoogleAuth", "Google sign-in failed: ${e.statusCode} - ${e.message}")
+        }
+    }
+
+    // Logic điều hướng: Giữ nguyên cơ chế bảo mật xóa lịch sử
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) {
             navController.navigate(Screen.MainScreen.route) {
-                popUpTo(0) { inclusive = true } // Xóa sạch mọi thứ trước đó
+                popUpTo(0) { inclusive = true }
                 launchSingleTop = true
             }
         }
     }
 
-    // --- GIAO DIỆN TĨNH VỚI GRADIENT ---
+    // --- GIAO DIỆN TĨNH VỚI GRADIENT (Ổn định 100%, không bị vẽ lại khi gõ chữ) ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF4B8361), // Màu xanh chủ đạo
-                        Color(0xFF2D503B)  // Màu tối hơn tạo chiều sâu
-                    )
+                    colors = listOf(Color(0xFF4B8361), Color(0xFF2D503B))
                 )
             )
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Phần Header chiếm 30% màn hình
+        Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+
+            // Header Section
             Spacer(modifier = Modifier.weight(0.3f))
-
-            Text(
-                text = "MoneyMate",
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White
-            )
-            Text(
-                text = "Quản lý thông minh - Tương lai vững chắc",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.8f)
-            )
-
+            Text(text = "MoneyMate", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(text = "Quản lý thông minh - Tương lai vững chắc", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
             Spacer(modifier = Modifier.weight(0.1f))
 
-            // Phần Form màu trắng nằm trong Surface bo góc
+            // Form Content bên trong Surface
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
                 color = Color.White,
                 tonalElevation = 8.dp
@@ -127,51 +139,27 @@ fun LoginScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(32.dp)
-                        .verticalScroll(rememberScrollState()), // Hỗ trợ màn hình nhỏ
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "Chào mừng quay trở lại!",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF2D503B)
-                    )
-
+                    Text(text = "Chào mừng quay trở lại!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2D503B))
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Email Input
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email") },
-                        placeholder = { Text("example@gmail.com") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    // 1. Ô nhập Email được cô lập hoàn toàn
+                    EmailInputField(
+                        value = emailState,
+                        onValueChange = { emailState = it }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Password Input
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Mật khẩu") },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = null)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    // 2. Ô nhập Mật khẩu được cô lập hoàn toàn
+                    PasswordInputField(
+                        value = passwordState,
+                        onValueChange = { passwordState = it }
                     )
 
-                    // Error Message
+                    // Hiển thị thông báo lỗi (Chỉ vẽ lại khi luồng State Auth lỗi thực sự thay đổi)
                     if (uiState.error.isNotEmpty()) {
                         Text(
                             text = uiState.error,
@@ -183,15 +171,13 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Login Button
+                    // 3. Nút Đăng nhập tối ưu hóa Recompose
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            viewModel.login(email, password)
+                            viewModel.login(emailState, passwordState)
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = !uiState.isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4B8361))
@@ -205,7 +191,7 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Register Link
+                    // Điều hướng sang đăng ký
                     Row {
                         Text("Chưa có tài khoản? ", color = Color.Gray)
                         Text(
@@ -215,6 +201,7 @@ fun LoginScreen(
                             modifier = Modifier.clickable { navController.navigate("register") }
                         )
                     }
+
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
@@ -223,11 +210,17 @@ fun LoginScreen(
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    val context = androidx.compose.ui.platform. LocalContext.current
+                    // 4. Nút đăng nhập Google
                     GoogleSignInButton(
                         onClick = {
                             focusManager.clearFocus()
-                            viewModel.signInWithGoogle(context)
+                            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestIdToken("458037840211-8591f2k268qa9cfr5q0uefuss5tcd0qh.apps.googleusercontent.com")
+                                .requestEmail()
+                                .build()
+
+                            val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                            googleSignInLauncher.launch(googleSignInClient.signInIntent)
                         },
                         isLoading = uiState.isLoading
                     )
@@ -237,20 +230,58 @@ fun LoginScreen(
     }
 }
 
+// --- CÁC THÀNH PHẦN ĐƯỢC TÁCH BIỆT ĐỂ KHỬ TRÙNG SKIP FRAME ---
+
+@Composable
+fun EmailInputField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Email") },
+        placeholder = { Text("example@gmail.com") },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+    )
+}
+
+@Composable
+fun PasswordInputField(value: String, onValueChange: (String) -> Unit) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Mật khẩu") },
+        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                Icon(
+                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                    contentDescription = null
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+    )
+}
+
 @Composable
 fun GoogleSignInButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
-){
+) {
     Surface(
-        // Ngăn click khi đang load để tránh chồng chéo Coroutine
         onClick = { if (!isLoading) onClick() },
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, Color.LightGray),
         color = if (isLoading) Color.LightGray.copy(alpha = 0.5f) else Color.White,
         modifier = modifier.fillMaxWidth().height(50.dp)
-    ){
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,

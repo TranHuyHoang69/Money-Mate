@@ -1,8 +1,8 @@
-
 package com.example.moneymate.di
 
 import android.content.Context
 import androidx.credentials.CredentialManager
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,5 +20,11 @@ object AuthModule {
         @ApplicationContext context: Context
     ): CredentialManager {
         return CredentialManager.create(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseFirestore(): FirebaseFirestore {
+        return FirebaseFirestore.getInstance()
     }
 }

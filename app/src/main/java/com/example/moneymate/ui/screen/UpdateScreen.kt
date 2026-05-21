@@ -2,6 +2,7 @@ package com.example.moneymate.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,14 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -34,6 +31,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,19 +55,18 @@ fun UpdateScreen(
     expenseId: Long = -1L,
     viewModel: AddExpenseViewModel = hiltViewModel()
 ) {
-    // 1. Tự động load dữ liệu thông qua Event khi vào màn hình
     LaunchedEffect(expenseId) {
         if (expenseId != -1L) {
             viewModel.onEvent(AddExpenseEvent.LoadDetails(expenseId))
         }
     }
 
-    // 2. Lấy UI State duy nhất từ ViewModel
     val state = viewModel.uiState
 
-    // 3. Xác định màu chủ đạo dựa trên TransactionType (Enum)
-    val themeColor = if (state.selectedType == TransactionType.SPEND)
-        Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    // Tối ưu hóa việc chọn màu chủ đạo, chỉ cập nhật khi Type thay đổi thực sự
+    val themeColor = remember(state.selectedType) {
+        if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F9FA))) {
         HeaderUpdate(
@@ -117,7 +114,6 @@ fun HeaderUpdate(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Tab chọn Chi phí / Thu nhập
         Row(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -157,25 +153,25 @@ fun FormSectionUpdate(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
-        item {
+        // 1. Ô Nhập số tiền cô lập (Đọc giá trị amount gián tiếp qua Lambda)
+        item(contentType = "AmountInput") {
             Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            OutlinedTextField(
-                value = state.amount,
-                onValueChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, color = themeColor),
-                placeholder = { Text("0.00", color = Color.LightGray) },
-                trailingIcon = { Text("₫", fontWeight = FontWeight.Bold, color = themeColor) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(16.dp)
+            AmountInputUpdateField(
+                amount = state.amount,
+                themeColor = themeColor,
+                onAmountChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) }
             )
-
             Spacer(modifier = Modifier.height(24.dp))
+        }
 
+        // 2. Phần Danh Mục Giao Dịch
+        item(contentType = "CategoryGrid") {
             Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+
             when (val categoriesResult = state.categories) {
                 is Result.Success -> {
-                    CategoryGridUpdate(
+                    CategoryOptimizedGrid(
                         categories = categoriesResult.data,
                         themeColor = themeColor,
                         selectedCategory = state.selectedCategory,
@@ -191,30 +187,20 @@ fun FormSectionUpdate(
                     Text("Lỗi: ${categoriesResult.message}", color = Color.Red)
                 }
             }
-
             Spacer(modifier = Modifier.height(24.dp))
+        }
 
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Ghi chú", color = Color.Gray, fontSize = 12.sp)
-                    OutlinedTextField(
-                        value = state.note,
-                        onValueChange = { viewModel.onEvent(AddExpenseEvent.ChangeNote(it)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent
-                        )
-                    )
-                }
-            }
-
+        // 3. Ô ghi chú độc lập
+        item(contentType = "NoteInput") {
+            NoteInputField(
+                note = state.note,
+                onNoteChange = { viewModel.onEvent(AddExpenseEvent.ChangeNote(it)) }
+            )
             Spacer(modifier = Modifier.height(32.dp))
+        }
 
+        // 4. Nút Xác Nhận hành động
+        item(contentType = "SubmitButton") {
             Button(
                 onClick = { viewModel.onEvent(AddExpenseEvent.Save(onSuccess)) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -227,30 +213,84 @@ fun FormSectionUpdate(
     }
 }
 
+// --- CÁC COMPOSABLE THÀNH PHẦN ĐƯỢC PHÂN RÃ ĐỂ CÔ LẬP TRẠNG THÁI ---
+
 @Composable
-fun CategoryGridUpdate(
+fun AmountInputUpdateField(amount: String, themeColor: Color, onAmountChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = amount,
+        onValueChange = onAmountChange,
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, color = themeColor),
+        placeholder = { Text("0.00", color = Color.LightGray) },
+        trailingIcon = { Text("₫", fontWeight = FontWeight.Bold, color = themeColor) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@Composable
+fun NoteInputField(note: String, onNoteChange: (String) -> Unit) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Ghi chú", color = Color.Gray, fontSize = 12.sp)
+            OutlinedTextField(
+                value = note,
+                onValueChange = onNoteChange,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Tối ưu hóa Grid danh mục bằng cách chia hàng qua Row thay vì lồng LazyVerticalGrid vào LazyColumn.
+ * Cách tiếp cận này loại bỏ việc đo đạc lại layout vô tận, sửa lỗi skip frame triệt để.
+ */
+@Composable
+fun CategoryOptimizedGrid(
     categories: List<Category>,
     themeColor: Color,
     selectedCategory: Category?,
     onCategorySelect: (Category) -> Unit
 ) {
-    val rows = (categories.size + 3) / 4
-    val gridHeight = (rows * 90).dp // Giảm chiều cao một chút cho cân đối
+    val chunkedCategories = remember(categories) { categories.chunked(4) }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        modifier = Modifier.heightIn(max = gridHeight),
-        userScrollEnabled = false,
-        contentPadding = PaddingValues(vertical = 8.dp)
-    ) {
-        items(categories) { category ->
-            val isSelected = selectedCategory?.id == category.id
-            CategoryItemUpdate(
-                category = category,
-                themeColor = themeColor,
-                isSelected = isSelected,
-                onClick = { onCategorySelect(category) }
-            )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        chunkedCategories.forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                rowItems.forEach { category ->
+                    val isSelected = selectedCategory?.id == category.id
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CategoryItemUpdate(
+                            category = category,
+                            themeColor = themeColor,
+                            isSelected = isSelected,
+                            onClick = { onCategorySelect(category) }
+                        )
+                    }
+                }
+                // Thêm các khoảng trống giả lập nếu hàng cuối không đủ 4 phần tử để căn chỉnh đều layout
+                if (rowItems.size < 4) {
+                    repeat(4 - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
     }
 }

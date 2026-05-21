@@ -58,10 +58,10 @@ fun RegisterScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var userName by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+    // Đẩy State xuống các Composable con để cô lập vùng bị Recompose khi gõ chữ
+    var emailState by remember { mutableStateOf("") }
+    var userNameState by remember { mutableStateOf("") }
+    var passwordState by remember { mutableStateOf("") }
 
     val focusManager = LocalFocusManager.current
 
@@ -69,20 +69,19 @@ fun RegisterScreen(
     LaunchedEffect(uiState.isRegisterSuccess) {
         if (uiState.isRegisterSuccess) {
             navController.navigate("login") {
-                // Xóa màn hình register khỏi backstack để không quay lại được khi nhấn back
                 popUpTo("register") { inclusive = true }
             }
         }
     }
 
-    // GIAO DIỆN TĨNH VỚI GRADIENT ĐỒNG BỘ MÀN LOGIN
+    // GIAO DIỆN TĨNH VỚI GRADIENT ĐỒNG BỘ MÀN LOGIN (Yên tâm chạy 60/120 FPS không lo vẽ lại bậy bạ)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF4B8361), // Xanh MoneyMate
+                        Color(0xFF4B8361),
                         Color(0xFF2D503B)
                     )
                 )
@@ -127,50 +126,29 @@ fun RegisterScreen(
                 ) {
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Email Input
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    // 1. Ô nhập Email đã được cô lập
+                    RegisterEmailField(
+                        value = emailState,
+                        onValueChange = { emailState = it }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Username Input
-                    OutlinedTextField(
-                        value = userName,
-                        onValueChange = { userName = it },
-                        label = { Text("Tên người dùng") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true
+                    // 2. Ô nhập Username đã được cô lập
+                    RegisterUsernameField(
+                        value = userNameState,
+                        onValueChange = { userNameState = it }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Password Input
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Mật khẩu") },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = null)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    // 3. Ô nhập Mật khẩu đã được cô lập cả ẩn/hiện mật khẩu
+                    RegisterPasswordField(
+                        value = passwordState,
+                        onValueChange = { passwordState = it }
                     )
 
-                    // Hiển thị lỗi nếu có
+                    // Hiển thị lỗi nếu có (Chỉ Recompose khi state lỗi thực sự thay đổi)
                     if (uiState.error.isNotEmpty()) {
                         Text(
                             text = uiState.error,
@@ -182,11 +160,11 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Button Register
+                    // Button Register (Hạn chế tối đa Recompose từ thằng cha)
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            viewModel.register(email, userName, password)
+                            viewModel.register(emailState, userNameState, passwordState)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -214,11 +192,61 @@ fun RegisterScreen(
                             text = "Đăng nhập",
                             color = Color(0xFF4B8361),
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable { navController.popBackStack() } // Dùng popBackStack cho mượt
+                            modifier = Modifier.clickable { navController.popBackStack() }
                         )
                     }
                 }
             }
         }
     }
+}
+
+// --- CÁC THÀNH PHẦN ĐƯỢC TÁCH RIÊNG ĐỂ CHẶN ĐỨNG SKIP FRAME ---
+
+@Composable
+fun RegisterEmailField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Email") },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+    )
+}
+
+@Composable
+fun RegisterUsernameField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Tên người dùng") },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true
+    )
+}
+
+@Composable
+fun RegisterPasswordField(value: String, onValueChange: (String) -> Unit) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Mật khẩu") },
+        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                Icon(
+                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                    contentDescription = null
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+    )
 }

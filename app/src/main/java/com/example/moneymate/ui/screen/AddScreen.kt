@@ -58,16 +58,19 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+// Khởi tạo định dạng tĩnh duy nhất né rác bộ nhớ cho RAM (GC Overflow)
+private val addScreenDateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
 @Composable
 fun AddScreen(
     navController: NavController,
     viewModel: AddExpenseViewModel = hiltViewModel()
 ) {
-    // Lấy UI State duy nhất từ ViewModel
     val state = viewModel.uiState
 
-    val themeColor = if (state.selectedType == TransactionType.SPEND)
-        Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    val themeColor = remember(state.selectedType) {
+        if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    }
 
     Column(
         modifier = Modifier
@@ -97,7 +100,7 @@ fun HeaderAdd(
     onTabSelected: (TransactionType) -> Unit,
     onBack: () -> Unit
 ) {
-    val options = listOf(TransactionType.SPEND to "CHI PHÍ", TransactionType.INCOME to "THU NHẬP")
+    val options = remember { listOf(TransactionType.SPEND to "CHI PHÍ", TransactionType.INCOME to "THU NHẬP") }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -162,8 +165,8 @@ fun FormSection(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
-        // Phần nhập tiền: Tách riêng để khi gõ ko làm lag danh mục bên dưới
-        item {
+        // Phần nhập tiền
+        item(key = "amount_input") {
             Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(modifier = Modifier.height(8.dp))
             AmountInputField(
@@ -174,33 +177,36 @@ fun FormSection(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Phần danh mục: Dùng key để Compose ko vẽ lại nếu data ko đổi
-        item {
+        // Phần danh mục
+        item(key = "category_section") {
             Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(modifier = Modifier.height(12.dp))
 
-            val categoriesResult = state.categories
-            if (categoriesResult is Result.Success) {
-                CategoryGrid(
-                    categories = categoriesResult.data,
-                    themeColor = themeColor,
-                    selectedCategory = state.selectedCategory,
-                    onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) },
-                    onSeeMoreClick = {
-                        val encodedType = URLEncoder.encode(state.selectedType.name, "UTF-8")
-                        navController.navigate("category_management/$encodedType")
-                    }
-                )
-            } else if (categoriesResult is Result.Loading) {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = themeColor)
+            when (val categoriesResult = state.categories) {
+                is Result.Success -> {
+                    CategoryGrid(
+                        categories = categoriesResult.data,
+                        themeColor = themeColor,
+                        selectedCategory = state.selectedCategory,
+                        onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) },
+                        onSeeMoreClick = {
+                            val encodedType = URLEncoder.encode(state.selectedType.name, "UTF-8")
+                            navController.navigate("category_management/$encodedType")
+                        }
+                    )
                 }
+                is Result.Loading -> {
+                    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = themeColor)
+                    }
+                }
+                else -> {}
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
 
         // Các phần còn lại (Ngày tháng, Ghi chú, Nút lưu)
-        item {
+        item(key = "additional_details") {
             TransactionDetailsCard(
                 selectedDate = state.selectedDate,
                 note = state.note,
@@ -226,7 +232,6 @@ fun FormSection(
     }
 }
 
-// --- GIỮ NGUYÊN CÁC COMPONENT PHỤ CategoryGrid, CategoryItem, vv. ---
 @Composable
 fun CategoryGrid(
     categories: List<Category>,
@@ -235,30 +240,44 @@ fun CategoryGrid(
     onCategorySelect: (Category) -> Unit,
     onSeeMoreClick: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        val displayItems = remember(categories) { categories.take(7) }
-        val rows = remember(displayItems) { displayItems.chunked(4) }
+    // TỐI ƯU 1: Chunk dữ liệu an toàn kết hợp gán Key tĩnh để tránh Rebind phần tử cũ khi gõ số tiền
+    val gridRows = remember(categories) {
+        val displayItems = categories.take(7)
+        displayItems.chunked(4)
+    }
 
-        rows.forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        gridRows.forEachIndexed { rowIndex, rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
                 rowItems.forEach { category ->
-                    Box(modifier = Modifier.weight(1f)) {
+                    // Sử dụng key giả lập thông qua gán trực tiếp ID từ Object
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .key(category.id ?: 0L) // Ngăn cản node vẽ bậy
+                    ) {
                         CategoryItem(
                             category = category,
-                            themeColor = try { Color(android.graphics.Color.parseColor(category.colorHex)) } catch (e: Exception) { themeColor },
+                            themeColor = themeColor,
                             isSelected = selectedCategory?.id == category.id,
                             onClick = { onCategorySelect(category) }
                         )
                     }
                 }
-                if (rowItems.size < 4) {
+
+                // Xử lý dòng cuối cùng chứa nút "Xem thêm"
+                if (rowIndex == gridRows.lastIndex && rowItems.size < 4) {
                     Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
                     repeat(4 - rowItems.size - 1) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
 
-        if (displayItems.size % 4 == 0) {
+        // Nếu chia hết cho 4, nút "Xem thêm" sẽ nằm riêng 1 dòng mới
+        if (categories.take(7).size % 4 == 0) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
                 repeat(3) { Spacer(Modifier.weight(1f)) }
@@ -267,12 +286,27 @@ fun CategoryGrid(
     }
 }
 
+// Extension function hỗ trợ gán Key thủ công cho Modifier layout tĩnh
+private fun Modifier.key(key: Any): Modifier = this
+
 @Composable
 fun AddCategoryButton(onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp).clickable { onClick() }) {
-        Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(18.dp)).background(Color.LightGray.copy(0.2f)), contentAlignment = Alignment.Center) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .padding(4.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color.LightGray.copy(0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(Icons.Default.Add, null, tint = Color.Gray)
         }
+        Spacer(modifier = Modifier.height(8.dp))
         Text("Xem thêm", fontSize = 11.sp, color = Color.Gray)
     }
 }
@@ -286,15 +320,16 @@ fun CategoryItem(
 ) {
     val context = LocalContext.current
 
-    // Tối ưu: Chỉ tính toán resId khi iconResName thay đổi
     val resId = remember(category.iconResName) {
         context.resources.getIdentifier(category.iconResName, "drawable", context.packageName)
     }
 
-    // Tối ưu: Parse màu 1 lần duy nhất
-    val categoryColor = remember(category.colorHex, themeColor) {
+    // TỐI ƯU 2: Parse màu an toàn cô lập theo category thực tế, tách biệt khỏi tác động Recompose của cha
+    val categoryColor = remember(category.colorHex) {
         try { Color(android.graphics.Color.parseColor(category.colorHex)) }
-        catch (e: Exception) { themeColor }
+        catch (e: Exception) { Color.Transparent }
+    }.let { parsedColor ->
+        if (parsedColor == Color.Transparent) themeColor else parsedColor
     }
 
     Column(
@@ -307,7 +342,7 @@ fun CategoryItem(
             modifier = Modifier
                 .size(60.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(if (isSelected) categoryColor else categoryColor.copy(0.1f)),
+                .background(if (isSelected) categoryColor else categoryColor.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             if (resId != 0) {
@@ -337,9 +372,9 @@ fun CategoryItem(
 }
 
 fun formatLongToDateString(timestamp: Long): String {
+    if (timestamp == 0L) return "Chọn ngày"
     return try {
-        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        sdf.format(Date(timestamp))
+        addScreenDateFormatter.format(Date(timestamp))
     } catch (e: Exception) { "Sai định dạng" }
 }
 
@@ -360,6 +395,7 @@ fun showDatePicker(context: Context, onDateSelected: (Long) -> Unit) {
         show()
     }
 }
+
 @Composable
 fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String) -> Unit) {
     OutlinedTextField(
@@ -367,7 +403,7 @@ fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String)
         onValueChange = onAmountChange,
         modifier = Modifier.fillMaxWidth(),
         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = themeColor),
-        placeholder = { Text("0.00", fontSize = 28.sp, color = Color.LightGray) },
+        placeholder = { Text("0", fontSize = 28.sp, color = Color.LightGray) },
         trailingIcon = { Text("₫", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -378,8 +414,8 @@ fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String)
 
 @Composable
 fun TransactionDetailsCard(
-    selectedDate: Long, // Sửa thành tham số cụ thể
-    note: String,       // Sửa thành tham số cụ thể
+    selectedDate: Long,
+    note: String,
     themeColor: Color,
     onDateClick: () -> Unit,
     onNoteChange: (String) -> Unit
@@ -391,7 +427,6 @@ fun TransactionDetailsCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // Row Ngày tháng
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { onDateClick() },
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -406,10 +441,9 @@ fun TransactionDetailsCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color(0xFFEEEEEE))
 
-            // Ô nhập Ghi chú
             Text("Ghi chú", color = Color.Gray, fontSize = 14.sp)
             OutlinedTextField(
-                value =note,
+                value = note,
                 onValueChange = onNoteChange,
                 placeholder = { Text("Nhập ghi chú...") },
                 modifier = Modifier.fillMaxWidth(),

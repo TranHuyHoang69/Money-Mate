@@ -18,4 +18,6 @@ interface ExpenseRepository {
     suspend fun insertCategory(category: Category): Result<Unit>
     suspend fun updateCategory(category: Category): Result<Unit>
     suspend fun deleteCategory(category: Category): Result<Unit>
+
+    suspend fun clearAllLocalData(): Result<Unit>
 }

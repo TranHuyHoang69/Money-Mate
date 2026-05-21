@@ -50,6 +50,14 @@ class HomeViewModel @Inject constructor(
             delay(300)
             loadAllExpenses()
         }
+
+        viewModelScope.launch(Dispatchers.Default) {
+
+        }
+    }
+    fun reloadExpenses() {
+        android.util.Log.d("HomeViewModel", "Reloading expenses...")
+        loadAllExpenses()
     }
 
      fun loadAllExpenses() {
@@ -171,5 +179,9 @@ class HomeViewModel @Inject constructor(
         }
         currentCalendar = newCalendar
         loadAllExpenses() // Gọi lại hàm load từ DB
+    }
+    fun refreshExpenses() {
+        android.util.Log.d("HomeViewModel", "Refreshing expenses...")
+        loadAllExpenses()
     }
 }

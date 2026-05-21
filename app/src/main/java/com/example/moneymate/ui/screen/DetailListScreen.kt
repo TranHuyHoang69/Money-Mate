@@ -59,6 +59,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Khởi tạo một đối tượng tĩnh dùng chung duy nhất, tránh phân bổ rác bộ nhớ (GC Static Overhead)
+private val detailDateFormatter = SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale.getDefault())
+
+private val currencyFormatter = java.text.DecimalFormat("#,###").apply {
+    decimalFormatSymbols = java.text.DecimalFormatSymbols.getInstance(Locale.getDefault())
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailListScreen(
@@ -75,36 +82,33 @@ fun DetailListScreen(
         mutableStateOf(if (type.contains("THU", ignoreCase = true)) "THU NHẬP" else "CHI PHÍ")
     }
     var currentSortType by remember { mutableStateOf("Thời gian") }
-
-    // --- STATE CHO DATE RANGE PICKER ---
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // Khởi tạo state với thời gian hiện tại để tránh lỗi null khi render
     val dateRangePickerState = rememberDateRangePickerState(
         initialSelectedStartDateMillis = System.currentTimeMillis()
     )
 
-    // SỬA Dòng 93: Dùng remember để tránh tính toán lại màu vô ích
     val themeColor = remember(selectedType) {
         if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
     }
 
-    // Logic lọc danh sách
+    // Tối ưu 1: Lọc danh sách kết hợp map chuỗi thời gian được tính toán trước (Pre-computed Display Time)
     val filteredList = remember(expensesByPeriod, selectedType, categoryId) {
         expensesByPeriod.filter { expense ->
             val targetType = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
             val matchesType = expense.type == targetType
             val matchesCategory = if (categoryId == 0L) true else expense.category.id == categoryId
             matchesType && matchesCategory
+        }.map { expense ->
+            // Bọc dữ liệu kèm chuỗi thời gian đã được format sẵn, triệt tiêu gánh nặng khi cuộn LazyColumn
+            Pair(expense, detailDateFormatter.format(Date(expense.timestamp)))
         }
     }
 
-    // SỬA Dòng 106: Dùng remember để tránh duyệt danh sách tính tổng mỗi khi recompose
     val totalAmount = remember(filteredList) {
-        filteredList.sumOf { it.amount }
+        filteredList.sumOf { it.first.amount }
     }
 
-    // --- DIALOG CHỌN KHOẢNG THỜI GIAN ---
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -126,7 +130,6 @@ fun DetailListScreen(
                 }
             }
         ) {
-            // Giới hạn chiều cao để không bị tràn màn hình trên một số thiết bị
             Column(modifier = Modifier.heightIn(max = 500.dp)) {
                 DateRangePicker(
                     state = dateRangePickerState,
@@ -139,7 +142,7 @@ fun DetailListScreen(
                             fontSize = 14.sp
                         )
                     },
-                    showModeToggle = false // Tắt chế độ nhập liệu thủ công để UI gọn hơn
+                    showModeToggle = false
                 )
             }
         }
@@ -198,10 +201,15 @@ fun DetailListScreen(
                 }
             }
 
-            // Navigation Thời gian
+            // Navigation Thời gian (Truyền giá trị thay vì đọc trực tiếp state từ ViewModel ở cha)
             CompactTimeNavigation(
-                viewModel = historyViewModel,
+                currentMode = historyViewModel.calendarMode,
+                displayTime = historyViewModel.getDisplayTime(),
+                isNextEnabled = historyViewModel.isNextEnabled(),
                 themeColor = themeColor,
+                onModeChange = { historyViewModel.changeMode(it) },
+                onPrevious = { historyViewModel.movePrevious() },
+                onNext = { historyViewModel.moveNext() },
                 onRangeClick = { showDatePicker = true }
             )
 
@@ -216,7 +224,7 @@ fun DetailListScreen(
                 }
             )
 
-            // Danh sách
+            // Danh sách hiển thị
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
                     CircularProgressIndicator(color = themeColor)
@@ -226,16 +234,21 @@ fun DetailListScreen(
                     Text("Không có dữ liệu", color = Color.Gray)
                 }
             } else {
+                // Tối ưu 2: Thêm định danh Key cố định và tận dụng thời gian đã giải mã sẵn
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(filteredList) { expense ->
+                    items(
+                        items = filteredList,
+                        key = { pair -> pair.first.id }, // Cực kỳ quan trọng để cuộn siêu mượt mượt
+                        contentType = { "ExpenseItem" }
+                    ) { (expense, formattedTime) ->
                         ExpenseItem(
                             title = expense.category.title,
-                            percent = formatTimestampToDetail(expense.timestamp),
-                            amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} $",
-                            color = Color(android.graphics.Color.parseColor(expense.category.colorHex)),
+                            percent = formattedTime, // Không chạy hàm format ở đây nữa!
+                            amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${currencyFormatter.format(expense.amount)} đ",
+                            color = expense.category.colorHex.toComposeColor(),
                             modifier = Modifier.clickable {
                                 navController.navigate("detail_expense/${expense.id}")
                             }
@@ -249,8 +262,13 @@ fun DetailListScreen(
 
 @Composable
 fun CompactTimeNavigation(
-    viewModel: HistoryViewModel,
+    currentMode: CalendarMode,
+    displayTime: String,
+    isNextEnabled: Boolean,
     themeColor: Color,
+    onModeChange: (CalendarMode) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onRangeClick: () -> Unit
 ) {
     Column(modifier = Modifier
@@ -265,27 +283,26 @@ fun CompactTimeNavigation(
                 CalendarMode.YEAR to "Năm"
             )
             modes.forEach { (mode, label) ->
-                val isSelected = viewModel.calendarMode == mode
+                val isSelected = currentMode == mode
                 Text(
                     text = label,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { viewModel.changeMode(mode) }
+                        .clickable { onModeChange(mode) }
                         .padding(8.dp),
                     color = if (isSelected) themeColor else Color.Gray,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     fontSize = 13.sp
                 )
             }
-            // Nút Khoảng thời gian
             Text(
                 text = "Khoảng",
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onRangeClick() }
                     .padding(8.dp),
-                color = if (viewModel.calendarMode == CalendarMode.CUSTOM) themeColor else Color.Gray,
-                fontWeight = if (viewModel.calendarMode == CalendarMode.CUSTOM) FontWeight.Bold else FontWeight.Normal,
+                color = if (currentMode == CalendarMode.CUSTOM) themeColor else Color.Gray,
+                fontWeight = if (currentMode == CalendarMode.CUSTOM) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 13.sp
             )
         }
@@ -295,22 +312,22 @@ fun CompactTimeNavigation(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            val isCustom = viewModel.calendarMode == CalendarMode.CUSTOM
-            IconButton(onClick = { viewModel.movePrevious() }, enabled = !isCustom) {
+            val isCustom = currentMode == CalendarMode.CUSTOM
+            IconButton(onClick = onPrevious, enabled = !isCustom) {
                 Icon(Icons.Default.KeyboardArrowLeft, null, tint = if(isCustom) Color.LightGray else themeColor)
             }
             Text(
-                text = viewModel.getDisplayTime(),
+                text = displayTime,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
-            val isNextEnabled = viewModel.isNextEnabled() && !isCustom
-            IconButton(onClick = { viewModel.moveNext() }, enabled = isNextEnabled) {
+            val nextState = isNextEnabled && !isCustom
+            IconButton(onClick = onNext, enabled = nextState) {
                 Icon(
                     Icons.Default.KeyboardArrowRight,
                     null,
-                    tint = if (isNextEnabled) themeColor else Color.LightGray
+                    tint = if (nextState) themeColor else Color.LightGray
                 )
             }
         }
@@ -335,7 +352,7 @@ fun SummaryRow(
         Column {
             Text("Tổng cộng", fontSize = 13.sp, color = Color.Gray)
             Text(
-                text = "${String.format("%,.0f", totalAmount)} $",
+                text = "${String.format("%,.0f", totalAmount)} đ",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = themeColor
@@ -369,8 +386,18 @@ fun SummaryRow(
         }
     }
 }
-
-fun formatTimestampToDetail(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+// Thêm hàm tối ưu này ở ngoài cùng file UI hoặc file tiện ích
+fun String.toComposeColor(): Color {
+    return try {
+        // Tránh parseColor bằng cách chuyển đổi trực tiếp chuỗi sang Long (Ví dụ: #4B8361 hoặc 4B8361)
+        val cleanedHex = this.removePrefix("#")
+        val longHex = cleanedHex.toLong(16)
+        if (cleanedHex.length == 6) {
+            Color(longHex or 0xFF000000) // Thêm Alpha mặc định nếu chỉ có 6 ký tự
+        } else {
+            Color(longHex)
+        }
+    } catch (e: Exception) {
+        Color.Gray // Màu dự phòng nếu chuỗi hex lỗi
+    }
 }

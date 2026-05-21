@@ -1,15 +1,15 @@
 package com.example.moneymate.viewmodel
 
 import android.content.Context
-import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialRequest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.User
 import com.example.moneymate.domain.repository.AuthRepository
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.example.moneymate.domain.repository.ExpenseRepository
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +31,7 @@ data class AuthUiState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val credentialManager: CredentialManager
+    private val expenseRepository: ExpenseRepository
 ): ViewModel(){
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState
@@ -93,51 +93,120 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun logout() {
+    fun logout(context: Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                authRepository.logout() // Gọi hàm logout từ FirebaseRepository
+                authRepository.logout()
+                expenseRepository.clearAllLocalData()
 
-                // Reset toàn bộ UI State về mặc định ngay lập tức
-                _uiState.value = AuthUiState(
-                    isLoading = false,
-                    isLoggedIn = false,
-                    user = null
-                )
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = "Lỗi khi đăng xuất: ${e.message}") }
+                if(context != null){
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestIdToken("458037840211-8591f2k268qa9cfr5q0uefuss5tcd0qh.apps.googleusercontent.com")
+                        .requestEmail()
+                        .build()
+                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        android.util.Log.d("GoogleAuth","Google sign out completed")
+                    }
+                }
+
+                // ✅ Delay để đủ thời gian clear data
+                kotlinx.coroutines.delay(500)
+
+                withContext(Dispatchers.Main){
+                    _uiState.value = AuthUiState(
+                        isLoading = false,
+                        isLoggedIn = false,
+                        user = null
+                    )
+                }
+            }catch (e: Exception){
+                android.util.Log.e("AuthViewModel", "Error logging out ${e.message}",e)
+                _uiState.update { it.copy(isLoading = false, error = "Error logging out") }
             }
         }
     }
 
     // Trong AuthViewModel.kt
     fun signInWithGoogle(context: Context) {
-        // LƯU Ý: CredentialManager.getCredential() VẪN cần Activity Context
-        // để hiển thị hộp thoại chọn tài khoản (Bottom Sheet).
-        // Nhưng việc khởi tạo instance Manager đã được Hilt lo.
-
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = "") }
+
             try {
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId("your_server_client_id")
+                android.util.Log.d("GoogleAuth", "Starting Firebase GoogleSignIn...")
+
+                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken("458037840211-8591f2k268qa9cfr5q0uefuss5tcd0qh.apps.googleusercontent.com")
+                    .requestEmail()
                     .build()
 
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
-                    .build()
+                val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
-                // Sử dụng instance đã được inject
-                val result = credentialManager.getCredential(context, request)
+                // Lấy last signed in account
+                val account = GoogleSignIn.getLastSignedInAccount(context)
+                if (account != null) {
+                    android.util.Log.d("GoogleAuth", "Already signed in: ${account.email}")
+                    val idToken = account.idToken
+                    if (idToken != null) {
+                        // Đã có token, gọi Firebase
+                        val firebaseResult = withContext(Dispatchers.IO) {
+                            authRepository.signInWithGoogle(idToken)
+                        }
 
-                // Xử lý tiếp token...
-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
-                authRepository.signInWithGoogle(googleIdTokenCredential.idToken)
+                        when (firebaseResult) {
+                            is Result.Success -> {
+                                android.util.Log.d("GoogleAuth", "Firebase sign-in successful")
+                                _uiState.update { it.copy(isLoading = false) }
+                            }
+                            is Result.Error -> {
+                                android.util.Log.e("GoogleAuth", "Firebase error: ${firebaseResult.message}")
+                                _uiState.update { it.copy(isLoading = false, error = firebaseResult.message) }
+                            }
+                            else -> {
+                                _uiState.update { it.copy(isLoading = false) }
+                            }
+                        }
+                    } else {
+                        android.util.Log.d("GoogleAuth", "No ID token, signing out and retrying...")
+                        googleSignInClient.signOut()
+                        _uiState.update { it.copy(isLoading = false, error = "Vui lòng thử lại") }
+                    }
+                } else {
+                    android.util.Log.d("GoogleAuth", "No account signed in, show sign-in dialog")
+                    _uiState.update { it.copy(isLoading = false, error = "Vui lòng ấn nút Google lần nữa để đăng nhập") }
+                }
 
-                _uiState.update { it.copy(isLoading = false) }
+            } catch (e: ApiException) {
+                android.util.Log.e("GoogleAuth", "ApiException: ${e.statusCode} - ${e.message}", e)
+                _uiState.update {
+                    it.copy(isLoading = false, error = "Google API Error: ${e.message}")
+                }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Lỗi đăng nhập") }
+                android.util.Log.e("GoogleAuth", "Exception: ${e.message}", e)
+                _uiState.update {
+                    it.copy(isLoading = false, error = e.message ?: "Lỗi đăng nhập Google")
+                }
+            }
+        }
+    }
+    fun signInWithFirebase(idToken: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = true, error = "") }
+
+            val firebaseResult = authRepository.signInWithGoogle(idToken)
+
+            when (firebaseResult) {
+                is Result.Success -> {
+                    android.util.Log.d("GoogleAuth", "Firebase sign-in successful")
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+                is Result.Error -> {
+                    android.util.Log.e("GoogleAuth", "Firebase error: ${firebaseResult.message}")
+                    _uiState.update { it.copy(isLoading = false, error = firebaseResult.message) }
+                }
+                else -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
             }
         }
     }

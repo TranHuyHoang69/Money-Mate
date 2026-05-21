@@ -90,7 +90,13 @@ class HistoryViewModel @Inject constructor(
 
     fun updateSortType(type: SortType) {
         currentSortType = type
-        loadData()
+
+        // Nếu là CUSTOM thì không gọi loadData() (vì bị return), mà tự sắp xếp lại data đang có luôn
+        if (calendarMode == CalendarMode.CUSTOM) {
+            _uiState.value = sortExpenses(_uiState.value)
+        } else {
+            loadData()
+        }
     }
 
     fun changeMode(mode: CalendarMode) {

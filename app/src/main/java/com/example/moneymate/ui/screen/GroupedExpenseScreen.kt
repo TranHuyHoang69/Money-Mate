@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,9 +30,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,13 +49,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.item.ExpenseItem
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.SortType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// Khởi tạo một bản duy nhất để dùng lại, né việc new liên tục trong vòng lặp gây rác bộ nhớ (GC)
+private val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+private val timeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,19 +75,39 @@ fun GroupedExpenseScreen(
     val expenses by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
 
-    var showSortMenu by remember { mutableStateOf(false) }
 
-    // --- 1. THÊM STATE CHO DATE RANGE PICKER ---
+
+    var showSortMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
-    val dateRangePickerState = androidx.compose.material3.rememberDateRangePickerState()
+    val dateRangePickerState = rememberDateRangePickerState()
     val themeColor = Color(0xFF4B8361)
 
-    // --- 2. LOGIC DIALOG CHỌN NGÀY ---
+    // State lưu trữ dữ liệu sau khi đã gộp nhóm ở background
+    var groupedExpensesState by remember { mutableStateOf<Map<String, List<Expense>>>(emptyMap()) }
+
+    // Tối ưu 1: Chuyển toàn bộ logic Filter, Group, Format Date xuống Background Thread
+    LaunchedEffect(expenses, categoryName, historyViewModel.currentSortType) {
+        withContext(Dispatchers.Default) {
+            val filteredByCategory = if (categoryName == "Tất cả") {
+                expenses
+            } else {
+                expenses.filter { it.category.title == categoryName }
+            }
+
+            // Xử lý Group dựa trên định dạng chuỗi ngày tháng mẫu
+            filteredByCategory.groupBy { expense ->
+                dateFormatter.format(Date(expense.timestamp))
+            }
+        }.let {
+            groupedExpensesState = it
+        }
+    }
+
     if (showDatePicker) {
-        androidx.compose.material3.DatePickerDialog(
+        DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
+                TextButton(onClick = {
                     val start = dateRangePickerState.selectedStartDateMillis
                     val end = dateRangePickerState.selectedEndDateMillis
                     if (start != null && end != null) {
@@ -85,28 +117,14 @@ fun GroupedExpenseScreen(
                 }) { Text("Xác nhận", color = themeColor) }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showDatePicker = false }) {
-                    Text("Hủy")
-                }
+                TextButton(onClick = { showDatePicker = false }) { Text("Hủy") }
             }
         ) {
-            androidx.compose.material3.DateRangePicker(
+            DateRangePicker(
                 state = dateRangePickerState,
                 modifier = Modifier.weight(1f),
                 title = { Text("Chọn khoảng thời gian", Modifier.padding(16.dp)) }
             )
-        }
-    }
-
-    // Logic gộp nhóm (Giữ nguyên của bạn)
-    val groupedExpenses = remember(expenses, categoryName, historyViewModel.currentSortType) {
-        val filteredByCategory = if (categoryName == "Tất cả") {
-            expenses
-        } else {
-            expenses.filter { it.category.title == categoryName }
-        }
-        filteredByCategory.groupBy {
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it.timestamp))
         }
     }
 
@@ -117,7 +135,7 @@ fun GroupedExpenseScreen(
                     Column {
                         Text(text = categoryName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Tổng: ${String.format("%,.0f", totalAmount)} $",
+                            text = "Tổng: ${String.format("%,.0f", totalAmount)} đ",
                             fontSize = 14.sp,
                             color = themeColor,
                             fontWeight = FontWeight.Medium
@@ -139,18 +157,26 @@ fun GroupedExpenseScreen(
                 .fillMaxSize()
                 .background(Color(0xFFF8F9FA))
         ) {
-            // --- 3. CẬP NHẬT TRUYỀN THAM SỐ VÀO ĐÂY ---
+// ✅ ĐOẠN CODE ĐÃ SỬA ĐỔI TOÀN DIỆN TẠI DÒNG 115 ĐỂ ĐỒNG BỘ VỚI VIEWMODEL
             CompactTimeNavigation(
-                viewModel = historyViewModel,
+                currentMode = historyViewModel.calendarMode, // Đồng bộ biến Mode
+                displayTime = historyViewModel.getDisplayTime(), // Gọi hàm lấy chuỗi thời gian hiển thị
+                isNextEnabled = historyViewModel.isNextEnabled(), // Kiểm tra chặn nút tiến tương lai
+                onModeChange = { newMode ->
+                    // Ép kiểu hoặc truyền trực tiếp CalendarMode từ enum của bạn
+                    historyViewModel.changeMode(newMode)
+                },
+                onPrevious = { historyViewModel.movePrevious() }, // Gọi đúng hàm lùi thời gian
+                onNext = { historyViewModel.moveNext() },         // Gọi đúng hàm tiến thời gian
                 themeColor = themeColor,
-                onRangeClick = {
-                    showDatePicker = true // Mở Dialog khi nhấn vào "Khoảng"
-                }
+                onRangeClick = { showDatePicker = true }
             )
 
-            // Spinner Sắp xếp (Giữ nguyên logic của bạn)
+            // Spinner Sắp xếp
             Box(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
                 Surface(
@@ -188,22 +214,23 @@ fun GroupedExpenseScreen(
                 }
             }
 
-            // Danh sách hiển thị (Giữ nguyên logic Card của bạn)
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
                     CircularProgressIndicator(color = themeColor)
                 }
-            } else if (groupedExpenses.isEmpty()) {
+            } else if (groupedExpensesState.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Không có dữ liệu cho $categoryName", color = Color.Gray)
                 }
             } else {
+                // Tối ưu 2: Trải phẳng cấu trúc danh sách để tái trưng dụng View chuẩn chỉ
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    groupedExpenses.forEach { (date, items) ->
-                        item {
+                    groupedExpensesState.forEach { (date, items) ->
+                        // Header hiển thị Ngày tháng
+                        item(key = "header_$date", contentType = "HeaderDate") {
                             Text(
                                 text = date,
                                 modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
@@ -213,25 +240,34 @@ fun GroupedExpenseScreen(
                             )
                         }
 
-                        item {
+                        // Bao bọc danh sách các Item bên trong Card bằng việc dùng itemsIndexed lồng an toàn
+                        item(key = "card_$date", contentType = "GroupCard") {
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
                                 Column {
                                     items.forEachIndexed { index, expense ->
+                                        // Ghi nhận thời gian định dạng mượt mà
+                                        val formattedTime = remember(expense.timestamp) {
+                                            timeFormatter.format(Date(expense.timestamp))
+                                        }
+
                                         Box(modifier = Modifier.clickable {
                                             navController.navigate("detail_expense/${expense.id}")
                                         }) {
                                             ExpenseItem(
                                                 title = expense.category.title,
-                                                percent = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(expense.timestamp)),
-                                                amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} $",
+                                                percent = formattedTime,
+                                                amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} đ",
                                                 color = Color(android.graphics.Color.parseColor(expense.category.colorHex))
                                             )
                                         }
+
                                         if (items.size > 1 && index < items.size - 1) {
                                             HorizontalDivider(
                                                 modifier = Modifier.padding(horizontal = 16.dp),
