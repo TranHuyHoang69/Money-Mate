@@ -10,8 +10,10 @@ interface ExpenseRepository {
     fun getExpensesByPeriod(start: Long, end: Long): Flow<Result<List<Expense>>>
     suspend fun insertExpense(expense: Expense): Result<Unit>
     suspend fun updateExpense(expense: Expense): Result<Unit>
-    suspend fun deleteExpense(expense: Expense): Result<Unit>
+    suspend fun deleteExpense(firestoreId: String): Result<Unit> // ✅ Sửa ở đây thành String
     fun getExpenseById(id: Long): Flow<Result<Expense?>>
+    
+    fun getExpenseByFirestoreId(firestoreId: String): Flow<Result<Expense?>>
 
     fun getAllCategories(): Flow<Result<List<Category>>>
     fun getCategoriesByType(type: String): Flow<Result<List<Category>>>

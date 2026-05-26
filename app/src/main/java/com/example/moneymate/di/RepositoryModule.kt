@@ -2,8 +2,10 @@ package com.example.moneymate.di
 
 import com.example.moneymate.data.repository.AuthRepositoryImpl
 import com.example.moneymate.data.repository.ExpenseRepositoryImpl
+import com.example.moneymate.data.repository.ReminderRepositoryImpl
 import com.example.moneymate.domain.repository.AuthRepository
 import com.example.moneymate.domain.repository.ExpenseRepository
+import com.example.moneymate.domain.repository.ReminderRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -25,4 +27,10 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         impl: AuthRepositoryImpl
     ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReminderRepository(
+       impl : ReminderRepositoryImpl
+    ): ReminderRepository
 }

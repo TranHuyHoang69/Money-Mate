@@ -22,35 +22,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -65,29 +54,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.moneymate.domain.Result
-import com.example.moneymate.domain.model.Expense
+import com.example.moneymate.domain.model.GroupedExpense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.chart.MorphingChartSection
 import com.example.moneymate.ui.item.ExpenseItem
 import com.example.moneymate.ui.navigation.Screen
-import com.example.moneymate.viewmodel.AuthUiState
 import com.example.moneymate.viewmodel.AuthViewModel
 import com.example.moneymate.viewmodel.CalendarMode
 import com.example.moneymate.viewmodel.ChartData
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.HomeViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-data class CategoryGroup(
-    val category: com.example.moneymate.domain.model.Category,
-    val totalAmount: Double,
-    val transactionCount: Int,
-    val percentage: Float,
-    val singleId: Long
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +73,8 @@ fun HomeScreen(
     navController: NavController,
     historyViewModel: HistoryViewModel = hiltViewModel(),
     homeViewModel: HomeViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    onOpenDrawer: () -> Unit
 ) {
     // --- Data State ---
     val expensesByPeriod by historyViewModel.uiState.collectAsState()
@@ -103,14 +82,15 @@ fun HomeScreen(
     val allExpensesResult by homeViewModel.expensesState.collectAsState()
     val authUiState by authViewModel.uiState.collectAsState()
 
-    LaunchedEffect(authUiState.isLoggedIn) {
-        android.util.Log.d("HomeScreen", "Auth state changed: ${authUiState.isLoggedIn}")
-        homeViewModel.reloadExpenses()
+    LaunchedEffect(allExpensesResult, authUiState.isLoggedIn) {
+        if (authUiState.isLoggedIn) {
+            homeViewModel.reloadExpenses()
+        }
     }
 
     LaunchedEffect(authUiState.isLoggedIn) {
         android.util.Log.d("HomeScreen", "Auth changed: ${authUiState.isLoggedIn}")
-        historyViewModel.loadData()  // Force reload HistoryViewModel
+        historyViewModel.loadData()
         homeViewModel.reloadExpenses()
     }
 
@@ -120,27 +100,17 @@ fun HomeScreen(
     val themeColor = remember(selectedType) {
         if (selectedType == "CHI PHÍ") Color(0xFF4B8361) else Color(0xFF2E5B8B)
     }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     var showDatePicker by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
 
     // --- State sau tối ưu (Chạy dưới nền) ---
-    var totalBalance by remember { mutableDoubleStateOf(0.0) }
-    var categoryGroupedList by remember { mutableStateOf<List<CategoryGroup>>(emptyList()) }
+    val totalBalance by homeViewModel.totalBalance.collectAsState()
+    var categoryGroupedList by remember { mutableStateOf<List<GroupedExpense>>(emptyList()) }
     var chartData by remember { mutableStateOf<List<ChartData>>(emptyList()) }
 
-// 1. Xử lý tính toán tổng số dư dưới luồng nền khi allExpensesResult thay đổi
-    LaunchedEffect(allExpensesResult, authUiState.isLoggedIn) {  // ← Thêm authUiState.isLoggedIn
-        withContext(Dispatchers.Default) {
-            if (allExpensesResult is Result.Success) {
-                homeViewModel.calculateTotalBalance((allExpensesResult as Result.Success<List<Expense>>).data)
-            } else 0.0
-        }?.let { totalBalance = it }
-    }
-
-    // 2. Xử lý thuật toán map/group dữ liệu danh mục dưới luồng nền (Né chặn Main Thread)
+    // 1. Xử lý tính toán tổng số dư dưới luồng nền
     LaunchedEffect(expensesByPeriod, selectedType) {
         withContext(Dispatchers.Default) {
             val typeEnum = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
@@ -150,17 +120,46 @@ fun HomeScreen(
             val groups = filtered.groupBy { it.category.id }.map { (_, items) ->
                 val firstItem = items.first()
                 val groupSum = items.sumOf { it.amount }
-                CategoryGroup(
+                GroupedExpense(
                     category = firstItem.category,
                     totalAmount = groupSum,
                     transactionCount = items.size,
-                    percentage = if (totalAmountOfPeriod > 0) (groupSum / totalAmountOfPeriod * 100).toFloat() else 0f,
-                    singleId = firstItem.id
+                    type = typeEnum
                 )
             }.sortedByDescending { it.totalAmount }
 
             val charts = groups.map {
-                ChartData(it.category.title, it.totalAmount, it.percentage, it.category.colorHex)
+                val percentage = if (totalAmountOfPeriod > 0) (it.totalAmount / totalAmountOfPeriod * 100).toFloat() else 0f
+                ChartData(it.category.title, it.totalAmount, percentage, it.category.colorHex)
+            }
+            Pair(groups, charts)
+        }.let { (groups, charts) ->
+            categoryGroupedList = groups
+            chartData = charts
+        }
+    }
+
+    // 2. Xử lý thuật toán map/group dữ liệu danh mục dưới luồng nền dựa trên GroupedExpense
+    LaunchedEffect(expensesByPeriod, selectedType) {
+        withContext(Dispatchers.Default) {
+            val typeEnum = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+            val filtered = expensesByPeriod.filter { it.type == typeEnum }
+            val totalAmountOfPeriod = filtered.sumOf { it.amount }
+
+            val groups = filtered.groupBy { it.category.id }.map { (_, items) ->
+                val firstItem = items.first()
+                val groupSum = items.sumOf { it.amount }
+                GroupedExpense(
+                    category = firstItem.category,
+                    totalAmount = groupSum,
+                    transactionCount = items.size,
+                    type = typeEnum
+                )
+            }.sortedByDescending { it.totalAmount }
+
+            val charts = groups.map {
+                val percentage = if (totalAmountOfPeriod > 0) (it.totalAmount / totalAmountOfPeriod * 100).toFloat() else 0f
+                ChartData(it.category.title, it.totalAmount, percentage, it.category.colorHex)
             }
             Pair(groups, charts)
         }.let { (groups, charts) ->
@@ -208,178 +207,118 @@ fun HomeScreen(
 
     val context = LocalContext.current
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            HomeDrawerContent(
-                authUiState = authUiState,
-                totalBalance = totalBalance,
+    Box(modifier = Modifier.fillMaxSize().background(themeColor)) {
+        HeaderSection(
+            selectedType = selectedType,
+            totalBalance = totalBalance,
+            onTabSelected = { selectedType = it },
+            onMenuClick = onOpenDrawer
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 250.dp)
+                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .background(Color(0xFFF8F9FA))
+        ) {
+            TimeNavigationHeader(
+                viewModel = historyViewModel,
                 themeColor = themeColor,
-                onLogout = { authViewModel.logout(context) },
-                context = context,
-                onNavigate = { route ->
-                    scope.launch { drawerState.close() }
-                    navController.navigate(route)
-                }
-            )
-        }
-    ) {
-        Box(modifier = Modifier.fillMaxSize().background(themeColor)) {
-            HeaderSection(
-                selectedType = selectedType,
-                totalBalance = totalBalance,
-                onTabSelected = { selectedType = it },
-                onMenuClick = { scope.launch { drawerState.open() } }
+                onCustomRangeClick = { showDatePicker = true }
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 250.dp)
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(Color(0xFFF8F9FA))
-            ) {
-                TimeNavigationHeader(
-                    viewModel = historyViewModel,
-                    themeColor = themeColor,
-                    onCustomRangeClick = { showDatePicker = true }
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = scrollState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+                ) {
+                    item(contentType = "Spacer") { Spacer(modifier = Modifier.height(180.dp)) }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = scrollState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
-                    ) {
-                        item(contentType = "Spacer") { Spacer(modifier = Modifier.height(180.dp)) }
+                    if (isLoading) {
+                        item(contentType = "Loading") { LoadingUI(themeColor) }
+                    } else if (categoryGroupedList.isEmpty()) {
+                        item(contentType = "Empty") { EmptyStateSection() }
+                    } else {
+                        // ✅ ĐÃ CHỈNH SỬA TOÀN BỘ KHỐI ITEMS SẠCH SẼ, KHÔNG CÒN NGOẶC THỪA
+                        items(
+                            items = categoryGroupedList,
+                            key = { it.category.id },
+                            contentType = { "ExpenseItem" }
+                        ) { group ->
+                            ExpenseListItem(
+                                group = group,
+                                selectedType = selectedType,
+                                onClick = {
+                                    if (group.transactionCount > 1) {
+                                        val currentModeName = historyViewModel.calendarMode.name
+                                        val currentStartTimestamp = historyViewModel.currentStartTimePeriod
+                                        val currentEndTimestamp = historyViewModel.currentEndTimePeriod
+                                        val encodedAmount = group.totalAmount.toFloat()
 
-                        if (isLoading) {
-                            item(contentType = "Loading") { LoadingUI(themeColor) }
-                        } else if (categoryGroupedList.isEmpty()) {
-                            item(contentType = "Empty") { EmptyStateSection() }
-                        } else {
-                            items(
-                                items = categoryGroupedList,
-                                key = { it.category.id },
-                                contentType = { "ExpenseItem" }
-                            ) { group ->
-                                ExpenseListItem(
-                                    group = group,
-                                    selectedType = selectedType,
-                                    onClick = {
-                                        val route = if (group.transactionCount > 1)
-                                            "grouped_expense/${group.category.title}/${group.totalAmount}"
-                                        else
-                                            "detail_expense/${group.singleId}"
-                                        navController.navigate(route)
+                                        navController.navigate(
+                                            "grouped_expense/${group.category.title}/$encodedAmount/$currentModeName/$currentStartTimestamp/$currentEndTimestamp"
+                                        )
+                                    } else {
+                                        // Hoàn thiện nhánh click xem chi tiết khi chỉ có đúng 1 giao dịch độc nhất
+                                        val currentTypeEnum = if (selectedType == "CHI PHÍ") TransactionType.SPEND else TransactionType.INCOME
+                                        val singleTransaction = expensesByPeriod.find {
+                                            it.category.id == group.category.id && it.type == currentTypeEnum
+                                        }
+                                        val docId = singleTransaction?.firestoreDocId ?: ""
+                                        if (docId.isNotEmpty()) {
+                                            navController.navigate("detail_expense/$docId")
+                                        } else {
+                                            android.util.Log.e("HomeScreen", "Không tìm thấy mã chuỗi firestoreDocId!")
+                                        }
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
-
-                    // Khu vực Chart được bọc riêng để cập nhật mượt mà
-                    MorphingChartSection(
-                        chartData = chartData,
-                        morphProgress = morphProgress,
-                        dynamicHeight = dynamicChartHeight
-                    )
                 }
-            }
 
-            FloatingActionButton(
-                onClick = {
-                    if (authUiState.isLoggedIn) navController.navigate("add")
-                    else navController.navigate(Screen.Login.route)
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-                containerColor = Color(0xFFFFC107),
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                MorphingChartSection(
+                    chartData = chartData,
+                    morphProgress = morphProgress,
+                    dynamicHeight = dynamicChartHeight
+                )
             }
         }
-    }
 
-}
-@Composable
-fun HomeDrawerContent(
-    authUiState: AuthUiState,
-    totalBalance: Double,
-    themeColor: Color,
-    context: android.content.Context,
-    onLogout: () -> Unit,
-    onNavigate: (String) -> Unit
-) {
-    val isLoggedIn = authUiState.isLoggedIn
-    ModalDrawerSheet {
-        Spacer(modifier = Modifier.height(16.dp))
-        Column(modifier = Modifier.padding(24.dp)) {
-            Box(Modifier.size(64.dp).background(themeColor.copy(0.1f), CircleShape), Alignment.Center) {
-                val initial = if(isLoggedIn) authUiState.user?.userName?.take(1) ?: "U" else "?"
-                Text(initial, fontWeight = FontWeight.Bold, color = themeColor)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = if(isLoggedIn) authUiState.user?.userName ?: "Người dùng" else "Chế độ khách",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            if(isLoggedIn){
-                Text("${String.format("%,.0f",totalBalance)} đ", color = if(totalBalance > 0) themeColor else Color.Red)
-            }else{
-                Text("Đăng nhập để đồng bộ dữ liệu", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            }
-        }
-        HorizontalDivider()
-        NavigationDrawerItem(
-            label = { Text("Lịch sử") },
-            selected = false,
-            icon = { Icon(Icons.Default.History, null) },
+        FloatingActionButton(
             onClick = {
-                if(authUiState.isLoggedIn) onNavigate("history_all")
-                else onNavigate(Screen.Login.route)
-            }
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        if(isLoggedIn){
-            NavigationDrawerItem(
-                label = { Text("Đăng xuất") },
-                selected = false,
-                icon = { Icon(Icons.Default.Logout, null) },
-                onClick = onLogout,
-                colors = NavigationDrawerItemDefaults.colors(unselectedIconColor = Color.Red, unselectedTextColor = Color.Red),
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }else{
-            Column(modifier = Modifier.padding(16.dp)){
-                NavigationDrawerItem(
-                    label = {Text("Đăng nhập")},
-                    selected = false,
-                    onClick = {onNavigate(Screen.Login.route)},
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                NavigationDrawerItem(
-                    label = {Text("Đăng ký")},
-                    selected = false,
-                    onClick = {onNavigate(Screen.Register.route)},
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                if (authUiState.isLoggedIn) navController.navigate("add")
+                else navController.navigate(Screen.Login.route)
+            },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            containerColor = Color(0xFFFFC107),
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
         }
-
     }
 }
 
 @Composable
 fun HeaderSection(selectedType: String, totalBalance: Double, onTabSelected: (String) -> Unit, onMenuClick: () -> Unit) {
+    // Khởi tạo bộ format dấu chấm chuẩn Việt Nam
+    val balanceFormatter = remember {
+        java.text.DecimalFormat("#,###", java.text.DecimalFormatSymbols().apply {
+            groupingSeparator = '.'
+        })
+    }
+    val formattedBalance = if (totalBalance == 0.0) "0" else balanceFormatter.format(totalBalance)
+
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp)) {
         IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, null, tint = Color.White) }
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("TỔNG SỐ DƯ", color = Color.White.copy(0.6f), fontSize = 11.sp)
-            Text("${String.format("%,.0f", totalBalance)} đ", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
+            // ✅ ĐÃ SỬA: Hiển thị chuỗi số dư mượt mà theo cấu trúc phân tách hàng nghìn
+            Text("$formattedBalance đ", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
         }
+        // ... các phần Tab CHI PHÍ / THU NHẬP bên dưới giữ nguyên trạng thái cũ ...
         Spacer(modifier = Modifier.height(24.dp))
         Row(Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(0.1f)).padding(4.dp)) {
             listOf("CHI PHÍ", "THU NHẬP").forEach { title ->
@@ -422,7 +361,7 @@ fun TimeNavigationHeader(viewModel: HistoryViewModel, themeColor: Color, onCusto
 }
 
 @Composable
-fun ExpenseListItem(group: CategoryGroup, selectedType: String, onClick: () -> Unit) {
+fun ExpenseListItem(group: GroupedExpense, selectedType: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -434,7 +373,7 @@ fun ExpenseListItem(group: CategoryGroup, selectedType: String, onClick: () -> U
     ) {
         ExpenseItem(
             title = group.category.title,
-            percent = "${group.transactionCount} giao dịch (${String.format("%.1f", group.percentage)}%)",
+            percent = "${group.transactionCount} giao dịch",
             amount = "${if (selectedType == "CHI PHÍ") "-" else "+"} ${String.format("%,.0f", group.totalAmount)} đ",
             color = Color(android.graphics.Color.parseColor(group.category.colorHex))
         )

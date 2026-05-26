@@ -55,8 +55,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.firebase.components)
-    implementation(libs.androidx.compose.foundation.layout)
-    implementation(libs.androidx.compose.foundation)
+//    implementation(libs.androidx.compose.foundation.layout)
+//    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.benchmark.traceprocessor)
     implementation(libs.androidx.compose.remote.creation.core)
     implementation(libs.androidx.room.ktx)
@@ -84,7 +84,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.0")
     ksp("androidx.room:room-compiler:2.7.0")
 
-    implementation("androidx.compose.foundation:foundation:1.5.0+")
+//    implementation("androidx.compose.foundation:foundation:1.5.0+")
 
 
     // Google Credential Manager (Khuyên dùng cho Android 14+)

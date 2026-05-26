@@ -15,11 +15,12 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_DEFAULT
         )
     ],
-    indices = [Index("categoryId")] //Đánh index để truy vấn nhanh hơn
+    indices = [Index(value = ["firestoreDocId"], unique = true)] //Đánh index để truy vấn nhanh hơn
     )
 data class ExpenseEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val firestoreDocId: String = "",
     val type: String,
     val amount: Double,
     val categoryId: Long,

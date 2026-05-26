@@ -3,12 +3,13 @@ package com.example.moneymate.domain.usecase.expense
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.repository.ExpenseRepository
-import jakarta.inject.Inject
+import javax.inject.Inject
 
 class UpdateExpenseUseCase @Inject constructor(
-    private val expenseRepository: ExpenseRepository
+    private val repository: ExpenseRepository
 ) {
+    // Hàm này phải nhận vào Object Expense
     suspend operator fun invoke(expense: Expense): Result<Unit> {
-        return expenseRepository.updateExpense(expense)
+        return repository.updateExpense(expense)
     }
 }

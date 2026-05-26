@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -73,7 +73,8 @@ fun DetailListScreen(
     historyViewModel: HistoryViewModel = hiltViewModel(),
     categoryId: Long = 0L,
     categoryName: String = "Lịch sử giao dịch",
-    type: String = "CHI PHÍ"
+    type: String = "CHI PHÍ",
+    onOpenDrawer: () -> Unit
 ) {
     val expensesByPeriod by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
@@ -239,14 +240,14 @@ fun DetailListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(
+                    itemsIndexed(
                         items = filteredList,
-                        key = { pair -> pair.first.id }, // Cực kỳ quan trọng để cuộn siêu mượt mượt
-                        contentType = { "ExpenseItem" }
-                    ) { (expense, formattedTime) ->
+                        key = { index, pair -> "${pair.first.id}_$index" }, // Tạo chuỗi khóa độc nhất vô nhị
+                        contentType = { _, _ -> "ExpenseItem" }
+                    ) { index, (expense, formattedTime) ->
                         ExpenseItem(
                             title = expense.category.title,
-                            percent = formattedTime, // Không chạy hàm format ở đây nữa!
+                            percent = formattedTime,
                             amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${currencyFormatter.format(expense.amount)} đ",
                             color = expense.category.colorHex.toComposeColor(),
                             modifier = Modifier.clickable {

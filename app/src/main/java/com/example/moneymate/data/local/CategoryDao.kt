@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY title ASC")
-    fun getAllCategories(): Flow<List<CategoryEntity>> // Sửa tên thành số nhiều cho chuẩn
+    fun getAllCategories(): Flow<List<CategoryEntity>>
 
     @Query("SELECT * FROM categories WHERE type = :categoryType")
     fun getCategoriesByType(categoryType: String): Flow<List<CategoryEntity>>
@@ -24,6 +24,11 @@ interface CategoryDao {
 
     @Delete
     suspend fun deleteCategory(category: CategoryEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(categories: List<CategoryEntity>)
+
+    // 🟢 THÊM VÀO ĐÂY: Hàm giải phóng sạch bảng danh mục khi User thực hiện Logout hoặc Reset
+    @Query("DELETE FROM categories")
+    suspend fun clearAllCategories()
 }

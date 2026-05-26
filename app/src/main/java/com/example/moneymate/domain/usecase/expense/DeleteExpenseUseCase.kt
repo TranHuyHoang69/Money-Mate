@@ -1,15 +1,14 @@
 package com.example.moneymate.domain.usecase.expense
 
 import com.example.moneymate.domain.Result
-import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.repository.ExpenseRepository
-import jakarta.inject.Inject
+import javax.inject.Inject
 
 class DeleteExpenseUseCase @Inject constructor(
-    private val expenseRepository: ExpenseRepository
-)   {
-    suspend operator fun invoke(expense: Expense): Result<Unit> {
-        return expenseRepository.deleteExpense(expense)
+    private val repository: ExpenseRepository
+) {
+    // ✅ ĐÃ SỬA: Thay đổi tham số truyền vào từ `expense: Expense` thành `firestoreId: String`
+    suspend operator fun invoke(firestoreId: String): Result<Unit> {
+        return repository.deleteExpense(firestoreId)
     }
-
 }

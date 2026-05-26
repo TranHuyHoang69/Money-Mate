@@ -5,10 +5,18 @@ sealed class Screen(val route: String){
     object Login : Screen("login")
     object Register: Screen("register")
     object Add: Screen("add")
-    object DetailList : Screen("history-all")
-    object DetailExpense : Screen("detail_expense/{expenseId}")
+    object History : Screen("history_all")
+
+    // 🟢 ĐỔI THÀNH STRING ID: Nhận firestoreDocId thay thế cho expenseId kiểu Long cũ
+    object DetailExpense : Screen("detail_expense/{firestoreDocId}")
+
     object Update: Screen("update/{expenseId}")
-    object GroupedExpense : Screen("grouped_expense/{categoryName}/{totalAmount}")
+
+    // 🟢 Đồng bộ lại định tuyến danh mục theo ID và Type an toàn
+    object GroupedExpense : Screen("grouped_expense/{categoryId}/{type}")
+
     object AddCategory: Screen("add_category/{type}")
     object CategoryManagement: Screen("category_management/{type}")
+    object Reminder: Screen("reminder")
+    object ReminderAdd : Screen("reminder_add")
 }

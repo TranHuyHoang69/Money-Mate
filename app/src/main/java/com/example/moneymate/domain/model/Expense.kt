@@ -15,6 +15,7 @@ data class Category(
 
 data class Expense(
     val id: Long = 0,
+    val firestoreDocId: String = "",
     val type: TransactionType,
     val amount: Double,
     val category: Category,

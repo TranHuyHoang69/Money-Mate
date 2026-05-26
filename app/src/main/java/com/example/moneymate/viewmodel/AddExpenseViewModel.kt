@@ -11,8 +11,10 @@ import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.domain.usecase.ExpenseUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,36 +26,47 @@ data class AddExpenseUiState(
     val selectedCategory: Category? = null,
     val selectedDate: Long = System.currentTimeMillis(),
     val categories: Result<List<Category>> = Result.Loading,
-    val currentExpenseId: Long = -1L
+    val currentFirestoreDocId: String = ""
 )
 
 // --- EVENTS ---
 sealed class AddExpenseEvent {
+    data class LoadDetailsByFirestoreId(val id: String) : AddExpenseEvent()
     data class ChangeAmount(val amount: String) : AddExpenseEvent()
     data class ChangeNote(val note: String) : AddExpenseEvent()
     data class ChangeType(val type: TransactionType) : AddExpenseEvent()
     data class SelectCategory(val category: Category) : AddExpenseEvent()
     data class ChangeDate(val timestamp: Long) : AddExpenseEvent()
     data class LoadDetails(val expenseId: Long) : AddExpenseEvent()
-    data class Save(val onSuccess: () -> Unit) : AddExpenseEvent()
+    object Save : AddExpenseEvent()
+    object Delete : AddExpenseEvent() // ✅ ĐÃ THÊM: Event phục vụ cho nút Xóa
+}
+
+// --- UI SIDE EFFECTS ---
+sealed class AddExpenseUiEvent {
+    object SaveSuccess : AddExpenseUiEvent()
 }
 
 @HiltViewModel
 class AddExpenseViewModel @Inject constructor(
-    private val useCases: ExpenseUseCases // Inject bộ UseCases
+    private val useCases: ExpenseUseCases
 ) : ViewModel() {
 
-    // Đây là biến duy nhất UI cần quan sát
     var uiState by mutableStateOf(AddExpenseUiState())
         private set
+
+    private val _eventChannel = kotlinx.coroutines.channels.Channel<AddExpenseUiEvent>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    val eventFlow: kotlinx.coroutines.flow.Flow<AddExpenseUiEvent> = _eventChannel.receiveAsFlow()
 
     init {
         loadCategories()
     }
 
-    // Cổng duy nhất nhận tương tác từ UI
     fun onEvent(event: AddExpenseEvent) {
         when (event) {
+            is AddExpenseEvent.LoadDetailsByFirestoreId -> {
+                loadExpenseDetailsByFirestoreId(event.id)
+            }
             is AddExpenseEvent.ChangeAmount -> {
                 if (event.amount.all { it.isDigit() || it == '.' } && event.amount.count { it == '.' } <= 1) {
                     uiState = uiState.copy(amount = event.amount)
@@ -66,7 +79,7 @@ class AddExpenseViewModel @Inject constructor(
                 if (uiState.selectedType != event.type) {
                     uiState = uiState.copy(
                         selectedType = event.type,
-                        selectedCategory = null // Reset category khi đổi tab
+                        selectedCategory = null
                     )
                     loadCategories()
                 }
@@ -81,19 +94,18 @@ class AddExpenseViewModel @Inject constructor(
                 loadExpenseDetails(event.expenseId)
             }
             is AddExpenseEvent.Save -> {
-                saveExpense(event.onSuccess)
+                saveExpense()
+            }
+            is AddExpenseEvent.Delete -> { // ✅ ĐÃ THÊM: Bắt sự kiện Xóa khi click nút Xóa ở UI
+                deleteExpense()
             }
         }
     }
 
     private fun loadCategories() {
-        // Sử dụng UseCase để lấy danh sách danh mục theo type
-        // Lưu ý: Type truyền vào là Enum .name ("SPEND" hoặc "INCOME")
         useCases.getAllCategories(uiState.selectedType.name)
             .onEach { result ->
                 uiState = uiState.copy(categories = result)
-
-                // Nếu đang có category được chọn mà tab mới không có category đó thì reset
                 if (result is Result.Success) {
                     if (uiState.selectedCategory != null &&
                         result.data.none { it.id == uiState.selectedCategory?.id }) {
@@ -103,15 +115,19 @@ class AddExpenseViewModel @Inject constructor(
             }.launchIn(viewModelScope)
     }
 
-    private fun loadExpenseDetails(expenseId: Long) {
-        if (expenseId == -1L || uiState.currentExpenseId == expenseId) return
+    private fun loadExpenseDetailsByFirestoreId(id: String) {
+        if (id.isEmpty() || uiState.currentFirestoreDocId == id) return
 
         viewModelScope.launch {
-            useCases.getExpenseById(expenseId).collect { result ->
-                if (result is Result.Success && result.data != null) {
-                    val expense = result.data
+            val result = useCases.getExpenseByFirestoreId(id).first()
+
+            if (result is Result.Success<Expense?>) {
+                val expense = result.data
+
+                if (expense != null) {
                     uiState = uiState.copy(
-                        currentExpenseId = expense.id,
+                        // ✅ ĐÃ SỬA AN TOÀN: Dùng trực tiếp tham số `id` truyền từ màn hình vào để đảm bảo không bị rỗng
+                        currentFirestoreDocId = id,
                         amount = expense.amount.toString(),
                         note = expense.note,
                         selectedType = expense.type,
@@ -124,12 +140,30 @@ class AddExpenseViewModel @Inject constructor(
         }
     }
 
-    private fun saveExpense(onSuccess: () -> Unit) {
+    private fun loadExpenseDetails(expenseId: Long) {
+        if (expenseId == -1L) return
+        viewModelScope.launch {
+            val result = useCases.getExpenseById(expenseId).first()
+            if (result is Result.Success && result.data != null) {
+                val expense = result.data
+                uiState = uiState.copy(
+                    amount = expense.amount.toString(),
+                    note = expense.note,
+                    selectedType = expense.type,
+                    selectedCategory = expense.category,
+                    selectedDate = expense.timestamp
+                )
+                loadCategories()
+            }
+        }
+    }
+
+    private fun saveExpense() {
         val amountDouble = uiState.amount.toDoubleOrNull() ?: 0.0
         val category = uiState.selectedCategory ?: return
 
         val expense = Expense(
-            id = if (uiState.currentExpenseId == -1L) 0 else uiState.currentExpenseId,
+            firestoreDocId = uiState.currentFirestoreDocId,
             amount = amountDouble,
             note = uiState.note,
             type = uiState.selectedType,
@@ -138,14 +172,34 @@ class AddExpenseViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            val result = if (uiState.currentExpenseId == -1L) {
-                useCases.addExpense(expense)
-            } else {
-                useCases.updateExpense(expense)
+            try {
+                // ✅ Được bọc try-catch phòng trường hợp mạng lỗi hoặc Firestore từ chối ghi tài liệu
+                if (uiState.currentFirestoreDocId.isEmpty()) {
+                    useCases.addExpense(expense)
+                } else {
+                    useCases.updateExpense(expense)
+                }
+                // Phát tín hiệu đóng màn hình về UI lập tức
+                _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
+        }
+    }
 
-            if (result is Result.Success) {
-                onSuccess()
+    // ✅ ĐÃ THÊM: Logic xử lý Xóa bản ghi bằng Firestore ID chuỗi
+    private fun deleteExpense() {
+        val currentId = uiState.currentFirestoreDocId
+        if (currentId.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                // Gọi xuống UseCase xóa trên Firestore
+                useCases.deleteExpense(currentId)
+                // Phát tín hiệu đóng màn hình về UI lập tức sau khi xóa thành công
+                _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

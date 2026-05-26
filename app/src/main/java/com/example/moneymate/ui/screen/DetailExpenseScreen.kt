@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -20,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -39,16 +42,31 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// TỐI ƯU 1: Khởi tạo một đối tượng tĩnh dùng chung, triệt tiêu việc tạo rác Object liên tục
 private val detailExpenseFormatter = SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale.getDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailExpenseScreen(
     navController: NavController,
-    expenseId: Long,
+    firestoreDocId: String,
     viewModel: DetailExpenseViewModel = hiltViewModel()
 ) {
+    // Kích hoạt nạp dữ liệu chi tiết từ Firestore ID
+    LaunchedEffect(firestoreDocId) {
+        viewModel.loadExpenseByFirestoreId(firestoreDocId)
+    }
+
+    // ✅ ĐÃ THÊM: Lắng nghe sự kiện Xóa thành công từ ViewModel qua Channel để đóng màn hình an toàn,
+    // giải quyết dứt điểm lỗi nút Xóa bấm bị trơ do nghẽn luồng lambda.
+    // (Lưu ý: Đảm bảo trong DetailExpenseViewModel bạn đã cấu hình eventFlow / UI Event tương tự như Add Screen)
+    LaunchedEffect(key1 = Unit) {
+        // Giả định ViewModel chi tiết của bạn có kênh eventFlow tương tự, nếu chưa có, hãy bổ sung Channel vào DetailExpenseViewModel nhé!
+        viewModel.eventFlow.collect { event ->
+            // Khi nhận tín hiệu xoá thành công từ DB/Firestore ngầm, tự động lùi màn hình
+            navController.popBackStack()
+        }
+    }
+
     val expenseResult by viewModel.expenseState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
@@ -68,15 +86,16 @@ fun DetailExpenseScreen(
         // --- XỬ LÝ TRẠNG THÁI DỮ LIỆU ---
         when (val result = expenseResult) {
             is Result.Loading -> {
+                android.util.Log.d("DetailScreen", "Dữ liệu đang tải (Loading)...")
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF4B8361))
                 }
             }
             is Result.Success -> {
                 val item = result.data
-                if (item != null) {
+                android.util.Log.d("DetailScreen", "Tải thành công! Dữ liệu item: $item")
 
-                    // TỐI ƯU 2: Tính toán trước chuỗi hiển thị và màu sắc theo Type, tránh re-compute bậy bạ
+                if (item != null) {
                     val themeColor = remember(item.type) {
                         if (item.type == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
                     }
@@ -90,32 +109,40 @@ fun DetailExpenseScreen(
                         if (item.type == TransactionType.SPEND) "Chi phí" else "Thu nhập"
                     }
 
-                    // --- HIỂN THỊ CHI TIẾT ---
-                    DetailRow("Số tiền", formattedAmount, valueColor = themeColor)
-                    DetailRow("Danh mục", item.category.title)
-                    DetailRow("Loại", transactionTypeLabel)
-                    DetailRow("Thời gian", formattedTime)
-                    DetailRow("Ghi chú", item.note.ifEmpty { "Không có ghi chú" })
+                    // Tối ưu hóa giao diện bằng LazyColumn để tránh lỗi lồng cuộn và cô lập hiển thị
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        item { DetailRow("Số tiền", formattedAmount, valueColor = themeColor) }
+                        item { DetailRow("Danh mục", item.category.title) }
+                        item { DetailRow("Loại", transactionTypeLabel) }
+                        item { DetailRow("Thời gian", formattedTime) }
+                        item { DetailRow("Ghi chú", item.note.ifEmpty { "Không có ghi chú" }) }
+                    }
 
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // --- HÀNG NÚT BẤM ĐỒNG BỘ MÀU CHỦ ĐẠO ---
+                    // --- HÀNG NÚT BẤM HÀNH ĐỘNG ---
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Button(
-                            onClick = { navController.navigate("update/${item.id}") },
+                            onClick = {
+                                // ✅ ĐÃ SỬA: Không check item.id nữa, truyền thẳng chuỗi firestoreDocId sang màn hình sửa
+                                if (firestoreDocId.isNotEmpty()) {
+                                    navController.navigate("update_screen/$firestoreDocId")
+                                }
+                            },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColor) // Tự động đổi màu Xanh lá/Xanh dương theo tab gốc
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColor)
                         ) {
                             Text("Sửa", fontWeight = FontWeight.Bold)
                         }
+
                         Button(
                             onClick = {
-                                viewModel.deleteExpense(item) {
-                                    navController.popBackStack()
-                                }
+                                // ✅ ĐÃ SỬA: Chỉ ra lệnh xóa thuần túy, việc phản hồi điều hướng giao cho LaunchedEffect gom qua Channel xử lý
+                                viewModel.deleteExpense(item)
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
@@ -130,6 +157,7 @@ fun DetailExpenseScreen(
                 }
             }
             is Result.Error -> {
+                android.util.Log.e("DetailScreen", "Lỗi tải dữ liệu: ${result.message}")
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Lỗi: ${result.message}", color = Color.Red, textAlign = TextAlign.Center)
                 }
@@ -142,12 +170,12 @@ fun DetailExpenseScreen(
 fun DetailRow(
     label: String,
     value: String,
-    valueColor: Color = Color.Black // Hỗ trợ gán màu tùy biến (Ví dụ số tiền chuyển đỏ/xanh lá cực sinh động)
+    valueColor: Color = Color.Black
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 14.dp), // Tăng một tí khoảng cách cho thoáng mắt chuẩn Material 3
+            .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

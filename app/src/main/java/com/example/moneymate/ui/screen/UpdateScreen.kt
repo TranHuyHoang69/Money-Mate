@@ -16,18 +16,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,9 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,23 +40,34 @@ import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.viewmodel.AddExpenseEvent
+import com.example.moneymate.viewmodel.AddExpenseUiEvent
 import com.example.moneymate.viewmodel.AddExpenseViewModel
 
 @Composable
 fun UpdateScreen(
     navController: NavController,
-    expenseId: Long = -1L,
-    viewModel: AddExpenseViewModel = hiltViewModel()
+    firestoreDocId: String,
+    viewModel: AddExpenseViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(expenseId) {
-        if (expenseId != -1L) {
-            viewModel.onEvent(AddExpenseEvent.LoadDetails(expenseId))
+    val state = viewModel.uiState
+    val context = LocalContext.current
+
+    LaunchedEffect(firestoreDocId) {
+        if (firestoreDocId.isNotEmpty()) {
+            viewModel.onEvent(AddExpenseEvent.LoadDetailsByFirestoreId(firestoreDocId))
         }
     }
 
-    val state = viewModel.uiState
+    LaunchedEffect(key1 = Unit) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is AddExpenseUiEvent.SaveSuccess -> {
+                    navController.popBackStack()
+                }
+            }
+        }
+    }
 
-    // Tối ưu hóa việc chọn màu chủ đạo, chỉ cập nhật khi Type thay đổi thực sự
     val themeColor = remember(state.selectedType) {
         if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
     }
@@ -74,14 +78,75 @@ fun UpdateScreen(
             selectedType = state.selectedType,
             onTabSelected = { viewModel.onEvent(AddExpenseEvent.ChangeType(it)) },
             onBack = { navController.popBackStack() },
-            isEditMode = expenseId != -1L
+            isEditMode = firestoreDocId.isNotEmpty()
         )
 
-        FormSectionUpdate(
-            viewModel = viewModel,
-            themeColor = themeColor,
-            onSuccess = { navController.popBackStack() }
-        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
+        ) {
+            // 1. Ô Nhập số tiền (Đồng bộ UI với AddScreen)
+            item(key = "amount_input") {
+                Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Spacer(modifier = Modifier.height(8.dp))
+                AmountInputField(
+                    amount = state.amount,
+                    themeColor = themeColor,
+                    onAmountChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // 2. Phần Danh Mục Giao Dịch (Hiển thị tối đa 8 item, ẩn nút Xem thêm)
+            item(key = "category_section") {
+                Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when (val categoriesResult = state.categories) {
+                    is Result.Success -> {
+                        CategoryUpdateGrid(
+                            categories = categoriesResult.data,
+                            themeColor = themeColor,
+                            selectedCategory = state.selectedCategory,
+                            onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) }
+                        )
+                    }
+                    is Result.Loading -> {
+                        Box(Modifier.fillMaxWidth().height(120.dp), Alignment.Center) {
+                            CircularProgressIndicator(color = themeColor)
+                        }
+                    }
+                    else -> {}
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // 3. Khối thông tin bổ sung & duy nhất một nút XÁC NHẬN lớn
+            item(key = "additional_details") {
+                TransactionDetailsCard(
+                    selectedDate = state.selectedDate,
+                    note = state.note,
+                    themeColor = themeColor,
+                    onDateClick = {
+                        showDatePicker(context) { viewModel.onEvent(AddExpenseEvent.ChangeDate(it)) }
+                    },
+                    onNoteChange = { viewModel.onEvent(AddExpenseEvent.ChangeNote(it)) }
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn khối Row chia tỉ lệ nút Xóa, đưa nút Xác Nhận về full màn hình giống AddScreen
+                Button(
+                    onClick = { viewModel.onEvent(AddExpenseEvent.Save) },
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColor),
+                    enabled = state.amount.isNotBlank() && state.selectedCategory != null
+                ) {
+                    Text("XÁC NHẬN", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                }
+            }
+        }
     }
 }
 
@@ -98,7 +163,7 @@ fun HeaderUpdate(
             .fillMaxWidth()
             .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
             .background(themeColor)
-            .padding(top = 48.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
+            .padding(top = 40.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -142,149 +207,33 @@ fun HeaderUpdate(
 }
 
 @Composable
-fun FormSectionUpdate(
-    viewModel: AddExpenseViewModel,
-    themeColor: Color,
-    onSuccess: () -> Unit
-) {
-    val state = viewModel.uiState
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
-    ) {
-        // 1. Ô Nhập số tiền cô lập (Đọc giá trị amount gián tiếp qua Lambda)
-        item(contentType = "AmountInput") {
-            Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            AmountInputUpdateField(
-                amount = state.amount,
-                themeColor = themeColor,
-                onAmountChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) }
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        // 2. Phần Danh Mục Giao Dịch
-        item(contentType = "CategoryGrid") {
-            Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            when (val categoriesResult = state.categories) {
-                is Result.Success -> {
-                    CategoryOptimizedGrid(
-                        categories = categoriesResult.data,
-                        themeColor = themeColor,
-                        selectedCategory = state.selectedCategory,
-                        onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) }
-                    )
-                }
-                is Result.Loading -> {
-                    Box(Modifier.fillMaxWidth().height(100.dp), Alignment.Center) {
-                        CircularProgressIndicator(color = themeColor)
-                    }
-                }
-                is Result.Error -> {
-                    Text("Lỗi: ${categoriesResult.message}", color = Color.Red)
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        // 3. Ô ghi chú độc lập
-        item(contentType = "NoteInput") {
-            NoteInputField(
-                note = state.note,
-                onNoteChange = { viewModel.onEvent(AddExpenseEvent.ChangeNote(it)) }
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-
-        // 4. Nút Xác Nhận hành động
-        item(contentType = "SubmitButton") {
-            Button(
-                onClick = { viewModel.onEvent(AddExpenseEvent.Save(onSuccess)) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = themeColor)
-            ) {
-                Text("XÁC NHẬN", fontWeight = FontWeight.Bold, color = Color.White)
-            }
-        }
-    }
-}
-
-// --- CÁC COMPOSABLE THÀNH PHẦN ĐƯỢC PHÂN RÃ ĐỂ CÔ LẬP TRẠNG THÁI ---
-
-@Composable
-fun AmountInputUpdateField(amount: String, themeColor: Color, onAmountChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = amount,
-        onValueChange = onAmountChange,
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, color = themeColor),
-        placeholder = { Text("0.00", color = Color.LightGray) },
-        trailingIcon = { Text("₫", fontWeight = FontWeight.Bold, color = themeColor) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        shape = RoundedCornerShape(16.dp)
-    )
-}
-
-@Composable
-fun NoteInputField(note: String, onNoteChange: (String) -> Unit) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Ghi chú", color = Color.Gray, fontSize = 12.sp)
-            OutlinedTextField(
-                value = note,
-                onValueChange = onNoteChange,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent
-                )
-            )
-        }
-    }
-}
-
-/**
- * Tối ưu hóa Grid danh mục bằng cách chia hàng qua Row thay vì lồng LazyVerticalGrid vào LazyColumn.
- * Cách tiếp cận này loại bỏ việc đo đạc lại layout vô tận, sửa lỗi skip frame triệt để.
- */
-@Composable
-fun CategoryOptimizedGrid(
+fun CategoryUpdateGrid(
     categories: List<Category>,
     themeColor: Color,
     selectedCategory: Category?,
     onCategorySelect: (Category) -> Unit
 ) {
-    val chunkedCategories = remember(categories) { categories.chunked(4) }
+    val gridRows = remember(categories) {
+        val displayItems = categories.take(8)
+        displayItems.chunked(4)
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        chunkedCategories.forEach { rowItems ->
+        gridRows.forEach { rowItems ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Start
             ) {
                 rowItems.forEach { category ->
-                    val isSelected = selectedCategory?.id == category.id
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CategoryItemUpdate(
+                    Box(modifier = Modifier.weight(1f)) {
+                        CategoryItem(
                             category = category,
                             themeColor = themeColor,
-                            isSelected = isSelected,
+                            isSelected = selectedCategory?.id == category.id,
                             onClick = { onCategorySelect(category) }
                         )
                     }
                 }
-                // Thêm các khoảng trống giả lập nếu hàng cuối không đủ 4 phần tử để căn chỉnh đều layout
                 if (rowItems.size < 4) {
                     repeat(4 - rowItems.size) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -292,32 +241,5 @@ fun CategoryOptimizedGrid(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun CategoryItemUpdate(
-    category: Category,
-    themeColor: Color,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(4.dp).clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (isSelected) themeColor else themeColor.copy(0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Bookmark, null,
-                tint = if (isSelected) Color.White else themeColor
-            )
-        }
-        Text(category.title, fontSize = 10.sp, maxLines = 1, textAlign = TextAlign.Center)
     }
 }

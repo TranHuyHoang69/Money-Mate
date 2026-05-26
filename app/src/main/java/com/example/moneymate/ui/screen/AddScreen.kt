@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +41,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +56,7 @@ import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.viewmodel.AddExpenseEvent
+import com.example.moneymate.viewmodel.AddExpenseUiEvent
 import com.example.moneymate.viewmodel.AddExpenseViewModel
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -70,6 +76,16 @@ fun AddScreen(
 
     val themeColor = remember(state.selectedType) {
         if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
+    }
+    LaunchedEffect(key1 = Unit) {
+        viewModel.eventFlow.collect { event ->
+            android.util.Log.d("MONEYMATE_DEBUG", "Đã nhận sự kiện trên UI: $event")
+            when(event){
+                is AddExpenseUiEvent.SaveSuccess ->{
+                    navController.popBackStack()
+                }
+            }
+        }
     }
 
     Column(
@@ -220,7 +236,7 @@ fun FormSection(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { viewModel.onEvent(AddExpenseEvent.Save(onSuccess)) },
+                onClick = { viewModel.onEvent(AddExpenseEvent.Save) }, // ✅ ĐÃ SỬA: Chỉ cần gọi Event Save trơn, không truyền lambda nữa
                 modifier = Modifier.fillMaxWidth().height(60.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor),
@@ -408,7 +424,8 @@ fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String)
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         shape = RoundedCornerShape(20.dp),
-        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor),
+        visualTransformation = ThousandSeparatorTransformation()
     )
 }
 
@@ -450,5 +467,58 @@ fun TransactionDetailsCard(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent)
             )
         }
+    }
+}
+
+class ThousandSeparatorTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val originalText = text.text
+        if (originalText.isEmpty()) {
+            return TransformedText(text, OffsetMapping.Identity)
+        }
+
+        // Định dạng chuỗi số gốc thành định dạng chứa dấu chấm ngăn cách hàng nghìn
+        val formattedText = StringBuilder()
+        var count = 0
+        for (i in originalText.indices.reversed()) {
+            formattedText.append(originalText[i])
+            count++
+            if (count % 3 == 0 && i != 0) {
+                formattedText.append('.')
+            }
+        }
+        val out = formattedText.reverse().toString()
+
+        // Xử lý dịch chuyển vị trí con trỏ chuột (Cursor) chính xác khi người dùng xóa/thêm số
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 0) return offset
+                var dots = 0
+                val length = originalText.length
+                for (i in 0 until offset) {
+                    val revIdx = length - 1 - i
+                    // Tính số dấu chấm sẽ xuất hiện phía trước vị trí hiện tại
+                    if ((length - revIdx) % 3 == 0 && revIdx != 0) {
+                        dots++
+                    }
+                }
+                // Nếu ký tự cuối cùng chia hết cho 3 nhưng nằm ở đầu chuỗi (index 0) thì không cộng dấu chấm
+                val realDots = if (offset == length && length % 3 == 0 && length > 0) dots - 1 else dots
+                val totalOffset = offset + (out.length - originalText.length) - (dots - realDots)
+                return totalOffset.coerceIn(0, out.length)
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                var originalOffset = offset
+                for (i in 0 until offset) {
+                    if (i < out.length && out[i] == '.') {
+                        originalOffset--
+                    }
+                }
+                return originalOffset.coerceIn(0, originalText.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(out), offsetMapping)
     }
 }

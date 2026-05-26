@@ -93,11 +93,7 @@ fun GroupedExpenseScreen(
             } else {
                 expenses.filter { it.category.title == categoryName }
             }
-
-            // Xử lý Group dựa trên định dạng chuỗi ngày tháng mẫu
-            filteredByCategory.groupBy { expense ->
-                dateFormatter.format(Date(expense.timestamp))
-            }
+            filteredByCategory.groupBy { dateFormatter.format(Date(it.timestamp)) }
         }.let {
             groupedExpensesState = it
         }
@@ -258,7 +254,13 @@ fun GroupedExpenseScreen(
                                         }
 
                                         Box(modifier = Modifier.clickable {
-                                            navController.navigate("detail_expense/${expense.id}")
+                                            // ✅ ĐÃ SỬA: Lấy chuỗi firestoreDocId thay thế cho id kiểu Long
+                                            val docId = expense.firestoreDocId
+                                            if (docId.isNotEmpty()) {
+                                                navController.navigate("detail_expense/$docId")
+                                            } else {
+                                                android.util.Log.e("GroupedScreen", "Giao dịch này không có firestoreDocId hợp lệ!")
+                                            }
                                         }) {
                                             ExpenseItem(
                                                 title = expense.category.title,

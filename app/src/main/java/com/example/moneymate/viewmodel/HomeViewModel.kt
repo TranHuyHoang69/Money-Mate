@@ -41,6 +41,8 @@ class HomeViewModel @Inject constructor(
     // Lắng nghe tất cả giao dịch từ DB
     private val _expensesState = MutableStateFlow<Result<List<Expense>>>(Result.Loading)
     val expensesState: StateFlow<Result<List<Expense>>> = _expensesState
+    private val _totalBalance = MutableStateFlow<Double>(0.0)
+    val totalBalance: StateFlow<Double> = _totalBalance
     var detailSortType by mutableStateOf("Thời gian")
     var currentCalendar by mutableStateOf(Calendar.getInstance())
 
@@ -60,10 +62,18 @@ class HomeViewModel @Inject constructor(
         loadAllExpenses()
     }
 
-     fun loadAllExpenses() {
+    fun loadAllExpenses() {
         viewModelScope.launch(Dispatchers.IO) {
             repository.getAllExpenses().collect { result ->
                 _expensesState.value = result
+
+                // ✅ ĐÃ THÊM: Tự động cập nhật số dư khi nhận dữ liệu mới
+                if (result is Result.Success) {
+                    val total = result.data.sumOf {
+                        if (it.type == TransactionType.INCOME) it.amount else -it.amount
+                    }
+                    _totalBalance.value = total
+                }
             }
         }
     }
@@ -117,16 +127,15 @@ class HomeViewModel @Inject constructor(
         }.flowOn(Dispatchers.Default) // Đảm bảo toàn bộ chuỗi Flow chạy trên Default
         .distinctUntilChanged()
 
-    // Hàm logic tính tổng số dư
-    fun calculateTotalBalance(expenses: List<Expense>): Double {
-        return expenses.sumOf {
-            if (it.type == TransactionType.INCOME) it.amount else -it.amount
-        }
-    }
-
     fun deleteExpense(expense: Expense, onSuccess: () -> Unit) {
+        // Kiểm tra an toàn: Nếu không có ID Firestore thì không xử lý xóa
+        if (expense.firestoreDocId.isEmpty()) return
+
         viewModelScope.launch {
-            repository.deleteExpense(expense) // Đảm bảo repository đã có hàm delete
+            //  ĐÃ SỬA: Truyền 'expense.firestoreDocId' (Kiểu String) thay vì truyền cả cục 'expense'
+            repository.deleteExpense(expense.firestoreDocId)
+
+            // Kích hoạt callback báo hiệu xóa thành công để UI cập nhật (ví dụ: đóng BottomSheet, ẩn Dialog)
             onSuccess()
         }
     }

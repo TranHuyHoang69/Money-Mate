@@ -1,41 +1,52 @@
 package com.example.moneymate.viewmodel
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow // ✅ ĐÃ THÊM: Import extension này để hết lỗi receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class DetailExpenseViewModel @Inject constructor(
-    private val repository: ExpenseRepository,
-    savedStateHandle: SavedStateHandle
+    private val repository: ExpenseRepository // Nhận vào repository
 ) : ViewModel() {
 
-    private val expenseId: Long = savedStateHandle.get<Long>("expenseId") ?: -1L
+    private val _expenseState = kotlinx.coroutines.flow.MutableStateFlow<Result<Expense?>>(Result.Loading)
+    val expenseState: StateFlow<Result<Expense?>> = _expenseState.asStateFlow()
 
-    // Khởi tạo StateFlow trực tiếp từ Flow của Repository
-    // Flow này sẽ tự động phát lại dữ liệu mới mỗi khi Database thay đổi (Update/Delete)
-    val expenseState: StateFlow<Result<Expense?>> = repository
-        .getExpenseById(expenseId)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Result.Loading
-        )
+    private val _eventChannel = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    val eventFlow = _eventChannel.receiveAsFlow()
 
-    // Hàm xóa vẫn giữ nguyên vì nó là hành động (action)
-    fun deleteExpense(expense: Expense, onSuccess: () -> Unit) {
+    fun loadExpenseByFirestoreId(firestoreId: String) {
+        if (firestoreId.isEmpty()) {
+            _expenseState.value = Result.Error("Mã định danh tài liệu trống")
+            return
+        }
+
         viewModelScope.launch {
-            repository.deleteExpense(expense)
-            onSuccess()
+            _expenseState.value = Result.Loading
+            repository.getExpenseByFirestoreId(firestoreId).collect { result ->
+                _expenseState.value = result
+            }
+        }
+    }
+
+    fun deleteExpense(expense: Expense) {
+        // Kiểm tra an toàn trước khi chạy Coroutine: Nếu ID trống thì không cần làm gì cả
+        if (expense.firestoreDocId.isEmpty()) return
+
+        viewModelScope.launch {
+            // ✅ ĐÃ SỬA: Chỉ truyền chuỗi ID 'firestoreDocId' thay vì truyền cả Object 'expense'
+            repository.deleteExpense(expense.firestoreDocId)
+
+            // Bắn tín hiệu kết thúc qua hàng đợi an toàn để ép UI popBackStack lập tức
+            _eventChannel.trySend(Unit)
         }
     }
 }

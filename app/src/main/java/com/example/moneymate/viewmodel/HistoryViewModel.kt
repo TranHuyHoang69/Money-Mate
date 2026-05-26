@@ -41,6 +41,11 @@ class HistoryViewModel @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading
 
     private var fetchJob: Job? = null
+    var currentStartTimePeriod: Long = 0L
+        private set
+
+    var currentEndTimePeriod: Long = 0L
+        private set
 
     init { loadData() }
 
@@ -54,6 +59,8 @@ class HistoryViewModel @Inject constructor(
     // Hàm mới để load theo khoảng ngày do người dùng chọn
     fun loadCustomRange(startMillis: Long, endMillis: Long) {
         calendarMode = CalendarMode.CUSTOM
+        currentStartTimePeriod = startMillis
+        currentEndTimePeriod = endMillis
 
         // Format text hiển thị: dd/MM - dd/MM
         val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -64,6 +71,8 @@ class HistoryViewModel @Inject constructor(
     }
 
     private fun fetchData(startTime: Long, endTime: Long) {
+        currentStartTimePeriod = startTime
+        currentEndTimePeriod = endTime
         fetchJob = viewModelScope.launch {
             repository.getExpensesByPeriod(startTime, endTime).collect { result ->
                 when (result) {

@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.moneymate.data.local.AppDatabase
 import com.example.moneymate.data.local.CategoryDao
 import com.example.moneymate.data.local.ExpenseDao
+import com.example.moneymate.data.local.ReminderDao
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Module
 import dagger.Provides
@@ -76,4 +77,10 @@ object DatabaseModule {
 
     @Provides
     fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideReminderDao(database: AppDatabase): ReminderDao{
+        return database.reminderDao()
+    }
 }

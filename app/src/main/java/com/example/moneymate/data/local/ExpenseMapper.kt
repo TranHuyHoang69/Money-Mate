@@ -42,6 +42,7 @@ fun Category.toEntity(): CategoryEntity {
 fun ExpenseWithCategory.toDomain(): Expense {
     return Expense(
         id = this.expense.id,
+        firestoreDocId = this.expense.firestoreDocId,
         type = try {
             TransactionType.valueOf(this.expense.type)
         } catch (e: Exception) {
@@ -59,6 +60,7 @@ fun ExpenseWithCategory.toDomain(): Expense {
 fun Expense.toEntity(): ExpenseEntity {
     return ExpenseEntity(
         id = this.id,
+        firestoreDocId = this.firestoreDocId,
         type = this.type.name,
         amount = this.amount,
         categoryId = this.category.id, // Lấy ID từ object Category để làm khóa ngoại
