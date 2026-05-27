@@ -2,6 +2,7 @@ package com.example.moneymate.ui.screen
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,6 +78,8 @@ fun AddScreen(
     val themeColor = remember(state.selectedType) {
         if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
     }
+
+    // Luồng lắng nghe sự kiện Save thành công
     LaunchedEffect(key1 = Unit) {
         viewModel.eventFlow.collect { event ->
             android.util.Log.d("MONEYMATE_DEBUG", "Đã nhận sự kiện trên UI: $event")
@@ -85,6 +88,37 @@ fun AddScreen(
                     navController.popBackStack()
                 }
             }
+        }
+    }
+
+    // 🟢 ĐÃ ĐỒNG BỘ: Lắng nghe và hứng dữ liệu danh mục truyền ngược về thông qua SavedStateHandle
+    val navBackStackEntry = navController.currentBackStackEntry
+    LaunchedEffect(navBackStackEntry) {
+        val savedStateHandle = navBackStackEntry?.savedStateHandle
+        val categoryId = savedStateHandle?.get<Long>("selected_category_id")
+
+        if (categoryId != null) {
+            val title = savedStateHandle.get<String>("selected_category_title").orEmpty()
+            val iconResName = savedStateHandle.get<String>("selected_category_icon").orEmpty()
+            val colorHex = savedStateHandle.get<String>("selected_category_color").orEmpty()
+
+            val returnedCategory = Category(
+                id = categoryId,
+                title = title,
+                iconResName = iconResName,
+                colorHex = colorHex,
+                type = state.selectedType,
+                isDefault = false
+            )
+
+            // Cập nhật danh mục vừa chọn vào ViewModel của màn AddScreen
+            viewModel.onEvent(AddExpenseEvent.SelectCategory(returnedCategory))
+
+            // Xóa dữ liệu trong SavedStateHandle để tránh việc Recompose nhận lại dữ liệu cũ khi cấu hình thay đổi
+            savedStateHandle.remove<Long>("selected_category_id")
+            savedStateHandle.remove<String>("selected_category_title")
+            savedStateHandle.remove<String>("selected_category_icon")
+            savedStateHandle.remove<String>("selected_category_color")
         }
     }
 
@@ -236,7 +270,7 @@ fun FormSection(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { viewModel.onEvent(AddExpenseEvent.Save) }, // ✅ ĐÃ SỬA: Chỉ cần gọi Event Save trơn, không truyền lambda nữa
+                onClick = { viewModel.onEvent(AddExpenseEvent.Save) },
                 modifier = Modifier.fillMaxWidth().height(60.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor),
@@ -256,10 +290,26 @@ fun CategoryGrid(
     onCategorySelect: (Category) -> Unit,
     onSeeMoreClick: () -> Unit
 ) {
-    // TỐI ƯU 1: Chunk dữ liệu an toàn kết hợp gán Key tĩnh để tránh Rebind phần tử cũ khi gõ số tiền
-    val gridRows = remember(categories) {
-        val displayItems = categories.take(7)
-        displayItems.chunked(4)
+    val gridRows = remember(categories, selectedCategory) {
+        val top7DefaultCategories = categories.take(7)
+
+        val finalDisplayList = if (selectedCategory != null) {
+            val isAlreadyInTop7 = top7DefaultCategories.any { it.id == selectedCategory.id }
+
+            if (isAlreadyInTop7) {
+                // 👉 Nếu có trong top 7 mặc định: Giữ nguyên vị trí cũ không đảo lên đầu
+                top7DefaultCategories
+            } else {
+                // 👉 Nếu KHÔNG nằm trong top 7: Đưa lên vị trí đầu tiên (Index 0)
+                val remainingItems = top7DefaultCategories.take(6)
+                listOf(selectedCategory) + remainingItems
+            }
+        } else {
+            top7DefaultCategories
+        }
+
+        // Chia mảng thành các dòng, mỗi dòng 4 cột
+        finalDisplayList.chunked(4)
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -269,11 +319,10 @@ fun CategoryGrid(
                 horizontalArrangement = Arrangement.Start
             ) {
                 rowItems.forEach { category ->
-                    // Sử dụng key giả lập thông qua gán trực tiếp ID từ Object
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .key(category.id ?: 0L) // Ngăn cản node vẽ bậy
+                            .key(category.id ?: 0L)
                     ) {
                         CategoryItem(
                             category = category,
@@ -284,7 +333,7 @@ fun CategoryGrid(
                     }
                 }
 
-                // Xử lý dòng cuối cùng chứa nút "Xem thêm"
+                // Xử lý dòng cuối cùng chứa nút "Xem thêm" nếu dòng đó chưa đủ 4 phần tử
                 if (rowIndex == gridRows.lastIndex && rowItems.size < 4) {
                     Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
                     repeat(4 - rowItems.size - 1) { Spacer(Modifier.weight(1f)) }
@@ -292,8 +341,9 @@ fun CategoryGrid(
             }
         }
 
-        // Nếu chia hết cho 4, nút "Xem thêm" sẽ nằm riêng 1 dòng mới
-        if (categories.take(7).size % 4 == 0) {
+        // Nếu tổng danh mục lấy ra bằng 4 hoặc 8, nút "Xem thêm" tự nhảy xuống dòng mới riêng biệt
+        val totalTaken = gridRows.flatten().size
+        if (totalTaken > 0 && totalTaken % 4 == 0) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
                 repeat(3) { Spacer(Modifier.weight(1f)) }
@@ -302,7 +352,6 @@ fun CategoryGrid(
     }
 }
 
-// Extension function hỗ trợ gán Key thủ công cho Modifier layout tĩnh
 private fun Modifier.key(key: Any): Modifier = this
 
 @Composable
@@ -340,7 +389,6 @@ fun CategoryItem(
         context.resources.getIdentifier(category.iconResName, "drawable", context.packageName)
     }
 
-    // TỐI ƯU 2: Parse màu an toàn cô lập theo category thực tế, tách biệt khỏi tác động Recompose của cha
     val categoryColor = remember(category.colorHex) {
         try { Color(android.graphics.Color.parseColor(category.colorHex)) }
         catch (e: Exception) { Color.Transparent }
@@ -353,12 +401,22 @@ fun CategoryItem(
         modifier = Modifier
             .padding(4.dp)
             .clickable { onClick() }
+            .background(
+                if (isSelected) categoryColor.copy(alpha = 0.12f) else Color.Transparent,
+                shape = RoundedCornerShape(14.dp)
+            )
+            .border(
+                width = if (isSelected) 1.dp else 0.dp,
+                color = if (isSelected) categoryColor.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(14.dp)
+            )
+            .padding(top = 8.dp, bottom = 6.dp, start = 4.dp, end = 4.dp)
     ) {
         Box(
             modifier = Modifier
                 .size(60.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(if (isSelected) categoryColor else categoryColor.copy(alpha = 0.1f)),
+                .background(if (isSelected) categoryColor else categoryColor.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
             if (resId != 0) {
@@ -381,6 +439,7 @@ fun CategoryItem(
             text = category.title,
             fontSize = 11.sp,
             color = if (isSelected) categoryColor else Color.DarkGray,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1
         )
@@ -477,7 +536,6 @@ class ThousandSeparatorTransformation : VisualTransformation {
             return TransformedText(text, OffsetMapping.Identity)
         }
 
-        // Định dạng chuỗi số gốc thành định dạng chứa dấu chấm ngăn cách hàng nghìn
         val formattedText = StringBuilder()
         var count = 0
         for (i in originalText.indices.reversed()) {
@@ -489,7 +547,6 @@ class ThousandSeparatorTransformation : VisualTransformation {
         }
         val out = formattedText.reverse().toString()
 
-        // Xử lý dịch chuyển vị trí con trỏ chuột (Cursor) chính xác khi người dùng xóa/thêm số
         val offsetMapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int {
                 if (offset <= 0) return offset
@@ -497,12 +554,10 @@ class ThousandSeparatorTransformation : VisualTransformation {
                 val length = originalText.length
                 for (i in 0 until offset) {
                     val revIdx = length - 1 - i
-                    // Tính số dấu chấm sẽ xuất hiện phía trước vị trí hiện tại
                     if ((length - revIdx) % 3 == 0 && revIdx != 0) {
                         dots++
                     }
                 }
-                // Nếu ký tự cuối cùng chia hết cho 3 nhưng nằm ở đầu chuỗi (index 0) thì không cộng dấu chấm
                 val realDots = if (offset == length && length % 3 == 0 && length > 0) dots - 1 else dots
                 val totalOffset = offset + (out.length - originalText.length) - (dots - realDots)
                 return totalOffset.coerceIn(0, out.length)

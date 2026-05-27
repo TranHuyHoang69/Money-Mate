@@ -19,4 +19,6 @@ sealed class Screen(val route: String){
     object CategoryManagement: Screen("category_management/{type}")
     object Reminder: Screen("reminder")
     object ReminderAdd : Screen("reminder_add")
+    object Profile: Screen("profile")
+
 }

@@ -210,4 +210,36 @@ class AuthViewModel @Inject constructor(
             }
         }
     }
+    fun deleteUserAccount(onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = true, error = "") }
+
+            // Gọi xuống repository để lấy instance và thực hiện xóa user
+            // (Hoặc nếu authRepository của bạn chưa có hàm delete, bạn có thể triển khai thông qua interface của nó)
+            val result = authRepository.deleteAccount()
+
+            withContext(Dispatchers.Main) {
+                when (result) {
+                    is Result.Success -> {
+                        // Xóa thành công dữ liệu local tương tự như khi logout
+                        expenseRepository.clearAllLocalData()
+
+                        _uiState.value = AuthUiState(
+                            isLoading = false,
+                            isLoggedIn = false,
+                            user = null
+                        )
+                        onSuccess()
+                    }
+                    is Result.Error -> {
+                        _uiState.update { it.copy(isLoading = false, error = result.message) }
+                        onFailure(Exception(result.message))
+                    }
+                    else -> {
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                }
+            }
+        }
+    }
 }

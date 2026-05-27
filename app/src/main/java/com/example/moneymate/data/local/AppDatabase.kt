@@ -17,7 +17,7 @@ import com.example.moneymate.domain.model.TransactionType
 
     @Database(
         entities = [ExpenseEntity::class, CategoryEntity::class, ReminderEntity::class],
-        version = 7, // Tăng version để Room cập nhật schema mới (có firestoreDocId)
+        version = 9, // Tăng version để Room cập nhật schema mới (có firestoreDocId)
         exportSchema = false
     )
     @TypeConverters(Converters::class) // <-- BẮT BUỘC PHẢI CÓ DÒNG NÀY

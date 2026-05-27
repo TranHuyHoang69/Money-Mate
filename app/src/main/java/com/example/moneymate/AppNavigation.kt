@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -17,6 +18,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.moneymate.data.local.CategoryEntity // Import Entity từ tầng Data
+import com.example.moneymate.domain.model.Category     // Import Model từ tầng Domain
+import com.example.moneymate.domain.model.TransactionType // Import Enum chuẩn
 import com.example.moneymate.ui.component.AppDrawer
 import com.example.moneymate.ui.screen.AddCategoryScreen
 import com.example.moneymate.ui.screen.AddReminderScreen
@@ -27,6 +31,7 @@ import com.example.moneymate.ui.screen.DetailListScreen
 import com.example.moneymate.ui.screen.GroupedExpenseScreen
 import com.example.moneymate.ui.screen.HomeScreen
 import com.example.moneymate.ui.screen.LoginScreen
+import com.example.moneymate.ui.screen.ProfileScreen
 import com.example.moneymate.ui.screen.RegisterScreen
 import com.example.moneymate.ui.screen.ReminderListScreen
 import com.example.moneymate.ui.screen.UpdateReminderScreen
@@ -52,21 +57,46 @@ fun AppNavigation() {
     val authViewModel: AuthViewModel = hiltViewModel()
     val authUiState by authViewModel.uiState.collectAsState()
 
-    // ✅ ĐA SỬA: Biến HomeViewModel thành Shared ViewModel gắn liền với vòng đời của Activity hiện tại
+    val categoryViewModel: CategoryViewModel = hiltViewModel()
+
+    // 1. Thu thập dữ liệu thô dạng List<CategoryEntity> từ Room DB phát ra qua Flow
+    val allCategoriesEntity by categoryViewModel.allCategories.collectAsState(initial = emptyList<CategoryEntity>())
+
+    // 2. Thực hiện chuyển đổi (Map) dữ liệu từ Entity sang Model sạch mà AppDrawer đang đợi nhận
+    // Sử dụng remember(allCategoriesEntity) để quá trình này chỉ chạy lại khi DB thực sự thay đổi dữ liệu
+    val allCategoriesMapped = remember(allCategoriesEntity) {
+        allCategoriesEntity.map { entity ->
+            Category(
+                id = entity.categoryId,
+                title = entity.title,
+                iconResName = entity.iconResName,
+                colorHex = entity.colorHex,
+                // Ép kiểu dữ liệu chuỗi hoặc định dạng tương đương từ DB sang Enum TransactionType
+                type = when(entity.type.toString().uppercase()) {
+                    "INCOME" -> TransactionType.INCOME
+                    else -> TransactionType.SPEND
+                },
+                isDefault = entity.isDefault
+            )
+        }
+    }
+
+    // Biến HomeViewModel thành Shared ViewModel gắn liền với vòng đời của Activity hiện tại
     val sharedHomeViewModel: HomeViewModel = hiltViewModel(
         viewModelStoreOwner = context as ViewModelStoreOwner
     )
 
-    // ✅ ĐA SỬA: Lắng nghe luồng StateFlow totalBalance động từ ViewModel dùng chung
+    // Lắng nghe luồng StateFlow totalBalance động từ ViewModel dùng chung
     val totalBalance by sharedHomeViewModel.totalBalance.collectAsState()
 
     AppDrawer(
         drawerState = drawerState,
         scope = scope,
         authUiState = authUiState,
-        totalBalance = totalBalance, // ✅ Truyền biến State động vào đây
+        totalBalance = totalBalance,
         themeColor = Color(0xFF4CB080),
         currentRoute = currentRoute,
+        categories = allCategoriesMapped, // 👈 3. Truyền list đã map đúng kiểu dữ liệu List<Category> vào đây
         onLogout = { authViewModel.logout(context) },
         onNavigate = { route ->
             if (route != currentRoute) {
@@ -78,6 +108,10 @@ fun AppNavigation() {
                     restoreState = true
                 }
             }
+        },
+        onNavigateToAddCategory = { typeString ->
+            // typeString nhận vào sẽ là "SPEND" hoặc "INCOME" tương ứng với route của bạn
+            navController.navigate("add_category/$typeString")
         }
     ) {
         NavHost(
@@ -100,10 +134,30 @@ fun AppNavigation() {
                 HomeScreen(
                     navController = navController,
                     historyViewModel = historyViewModel,
-                    homeViewModel = sharedHomeViewModel, // ✅ ĐA SỬA: Dùng chung thực thể với AppDrawer
+                    homeViewModel = sharedHomeViewModel,
                     authViewModel = authViewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
+            }
+
+            // --- THÔNG TIN CÁ NHÂN (PROFILE SCREEN) ---
+            composable(Screen.Profile.route) {
+                if (authUiState.isLoggedIn) {
+                    ProfileScreen(
+                        authViewModel = authViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onLogoutOrDeleteSuccess = {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onOpenDrawer = { scope.launch { drawerState.open() } }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Screen.Login.route)
+                    }
+                }
             }
 
             // --- ADD EXPENSE ---
@@ -225,15 +279,16 @@ fun AppNavigation() {
                 )
             }
 
-            // --- CATEGORY MANAGEMENT ---
+// --- CATEGORY MANAGEMENT ---
             composable(
                 route = "category_management/{type}",
                 arguments = listOf(navArgument("type") { type = NavType.StringType })
             ) { backStackEntry ->
                 val type = backStackEntry.arguments?.getString("type") ?: "SPEND"
+
                 CategoryManagementScreen(
                     navController = navController,
-                    type = type
+                    initialType = type // Truyền chuẩn tham số khởi tạo tab
                 )
             }
 
@@ -276,6 +331,8 @@ fun AppNavigation() {
                     }
                 }
             }
+
+            // --- CẬP NHẬT LỜI NHẮC ---
             composable(
                 route = "update_reminder_screen?reminderId={reminderId}",
                 arguments = listOf(

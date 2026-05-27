@@ -22,13 +22,15 @@ fun CategoryEntity.toDomain(): Category {
     )
 }
 
-fun Category.toEntity(): CategoryEntity {
+// 🟢 NHẬN THÊM THAM SỐ userId do đối tượng Category (Domain) của bạn không có trường này
+fun Category.toEntity(userId: String): CategoryEntity {
     return CategoryEntity(
         categoryId = this.id,
+        userId = userId,
         title = this.title,
         iconResName = this.iconResName,
         colorHex = this.colorHex,
-        type = this.type.name,    // Map từ Domain sang Entity (Hết lỗi tại đây)
+        type = this.type.name,
         isDefault = this.isDefault
     )
 }
@@ -36,9 +38,6 @@ fun Category.toEntity(): CategoryEntity {
 /**
  * Mappers cho Expense
  */
-
-// Chuyển từ "Dữ liệu liên kết" (DB) sang "Model nghiệp vụ" (Domain)
-// Dùng cho getAllExpenses, getExpenseById, v.v.
 fun ExpenseWithCategory.toDomain(): Expense {
     return Expense(
         id = this.expense.id,
@@ -55,15 +54,13 @@ fun ExpenseWithCategory.toDomain(): Expense {
     )
 }
 
-// Chuyển từ "Model nghiệp vụ" (Domain) sang "Thực thể đơn" (DB)
-// Dùng cho insertExpense, updateExpense
 fun Expense.toEntity(): ExpenseEntity {
     return ExpenseEntity(
         id = this.id,
         firestoreDocId = this.firestoreDocId,
         type = this.type.name,
         amount = this.amount,
-        categoryId = this.category.id, // Lấy ID từ object Category để làm khóa ngoại
+        categoryId = this.category.id,
         timestamp = this.timestamp,
         note = this.note
     )

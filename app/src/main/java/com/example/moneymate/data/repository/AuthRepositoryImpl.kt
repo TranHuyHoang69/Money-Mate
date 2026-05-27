@@ -95,4 +95,17 @@ class AuthRepositoryImpl @Inject constructor(
             Result.Error(e.message ?: "Lỗi xác thực Google")
         }
     }
+    override suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            val firebaseUser = auth.currentUser
+            if (firebaseUser != null) {
+                firebaseUser.delete().await()
+                Result.Success(Unit)
+            } else {
+                Result.Error("Không tìm thấy thông tin người dùng đang đăng nhập")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Lỗi khi xóa tài khoản")
+        }
+    }
 }

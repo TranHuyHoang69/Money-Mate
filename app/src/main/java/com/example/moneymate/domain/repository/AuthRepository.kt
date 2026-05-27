@@ -13,4 +13,6 @@ interface AuthRepository{
     suspend fun logout(): Result<Unit>
     suspend fun signInWithGoogle(idToken: String): Result<Boolean>
     fun observeAuthState(): Flow<User?>
+    suspend fun deleteAccount(): Result<Unit>
+
 }

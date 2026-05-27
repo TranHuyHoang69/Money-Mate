@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true)
     val categoryId: Long = 0,
+    val userId: String,
     val title: String,
     val iconResName: String, // Lưu tên String của icon (vd: "ic_food") để dễ quản lý
     val colorHex: String,    // Lưu mã màu dưới dạng Hex (vd: "#FF5733")

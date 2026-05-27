@@ -226,7 +226,8 @@ fun AddCategoryScreen(
                     onClick = {
                         onSave(
                             CategoryEntity(
-                                categoryId = 0,
+                                categoryId = 0L,
+                                userId = "guest", // 🟢 ĐÃ SỬA: Gán chuỗi tạm để thoả mãn constructor. ViewModel/Repository sẽ tự động override bằng UID thật từ FirebaseAuth
                                 title = name.trim(),
                                 iconResName = selectedIcon,
                                 colorHex = selectedColor,

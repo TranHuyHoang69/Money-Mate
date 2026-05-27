@@ -1,5 +1,6 @@
 package com.example.moneymate.data.remote
 
+import com.example.moneymate.data.local.CategoryEntity
 import com.example.moneymate.data.local.ReminderEntity
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
@@ -45,8 +46,8 @@ class FirestoreDataSource @Inject constructor(
                         data?.let {
                             val type = try { TransactionType.valueOf(it.type) } catch (e: Exception) { TransactionType.SPEND }
                             Expense(
-                                id = 0L, // 🟢 ĐỂ TRỐNG: ID tự tăng này sẽ do Room dưới Local tự cấp phát khi insert vào máy
-                                firestoreDocId = doc.id, // 🟢 QUAN TRỌNG NHẤT: Bốc chuẩn ID chuỗi từ tư liệu Firestore
+                                id = 0L,
+                                firestoreDocId = doc.id,
                                 type = type,
                                 amount = it.amount,
                                 timestamp = it.timestamp,
@@ -67,10 +68,9 @@ class FirestoreDataSource @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    suspend fun addExpense(expense: Expense): Result<String> = try { // 🟢 ĐÃ ĐỔI: Trả về String (ID tạo mới) để Repository đồng bộ ngược lại Room
+    suspend fun addExpense(expense: Expense): Result<String> = try {
         val userId = getCurrentUserId() ?: return Result.Error("User not authenticated")
 
-        // Sinh trước 1 tài liệu trống để nhận ID tĩnh không lo xung đột
         val docRef = firestore.collection("users").document(userId).collection("expenses").document()
         val generatedId = docRef.id
 
@@ -117,8 +117,89 @@ class FirestoreDataSource @Inject constructor(
         } catch (e: Exception) { Result.Error(e.message ?: "Error deleting expense") }
     }
 
+    // ==================== 🟢 QUẢN LÝ CATEGORIES ĐỒNG BỘ CLOUD ====================
 
-    // ==================== QUẢN LÝ REMINDER (GIỮ NGUYÊN BẢN FIX MỚI CỦA BẠN) ====================
+    fun observeUserCategories(): Flow<Result<List<CategoryEntity>>> = callbackFlow {
+        val userId = getCurrentUserId()
+        if (userId == null) {
+            trySend(Result.Success(emptyList()))
+            close()
+            return@callbackFlow
+        }
+
+        // Lắng nghe Realtime thay đổi danh mục của riêng User hiện tại trên Cloud
+        val listener = firestore.collection("users").document(userId).collection("categories")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Result.Error(error.message ?: "Unknown error"))
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val categories = snapshot.documents.mapNotNull { doc ->
+                        // 🟢 ĐÃ SỬA: Map chuẩn sang lớp FireStoreCategory (Chữ S viết hoa đồng bộ)
+                        val data = doc.toObject(FireStoreCategory::class.java)
+                        data?.let {
+                            CategoryEntity(
+                                categoryId = it.categoryId,
+                                userId = it.userId,
+                                title = it.title,
+                                iconResName = it.iconResName,
+                                colorHex = it.colorHex,
+                                type = it.type,
+                                isDefault = it.isDefault
+                            )
+                        }
+                    }
+                    trySend(Result.Success(categories))
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun saveCategoryToRemote(category: CategoryEntity): Result<Unit> = try {
+        val userId = getCurrentUserId() ?: return Result.Error("User not authenticated")
+
+        val remoteData = FireStoreCategory(
+            categoryId = category.categoryId,
+            userId = userId,
+            title = category.title,
+            iconResName = category.iconResName,
+            colorHex = category.colorHex,
+            type = category.type,
+            isDefault = category.isDefault
+        )
+
+        // 🟢 SỬA TẠI ĐÂY: Thống nhất lấy 'title' làm tên document để tự động ghi đè chống lặp
+        val docName = category.title
+
+        firestore.collection("users")
+            .document(userId)
+            .collection("categories")
+            .document(docName)
+            .set(remoteData)
+            .await()
+
+        Result.Success(Unit)
+    } catch (e: Exception) { Result.Error(e.message ?: "Error saving category to cloud") }
+
+    suspend fun deleteCategoryFromRemote(category: CategoryEntity): Result<Unit> = try {
+        val userId = getCurrentUserId() ?: return Result.Error("User not authenticated")
+
+        // 🟢 SỬA TẠI ĐÂY: Đồng bộ tên document theo 'title' khi xóa
+        val docName = category.title
+
+        firestore.collection("users")
+            .document(userId)
+            .collection("categories")
+            .document(docName)
+            .delete()
+            .await()
+
+        Result.Success(Unit)
+    } catch (e: Exception) { Result.Error(e.message ?: "Error deleting category from cloud") }
+
+
+    // ==================== QUẢN LÝ REMINDER ====================
 
     fun observeUserReminders(): Flow<Result<List<ReminderEntity>>> = callbackFlow {
         val userId = getCurrentUserId()
@@ -198,3 +279,4 @@ class FirestoreDataSource @Inject constructor(
         Result.Error(e.message ?: "Error deleting reminder")
     }
 }
+

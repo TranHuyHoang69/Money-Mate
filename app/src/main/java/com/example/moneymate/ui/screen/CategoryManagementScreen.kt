@@ -1,188 +1,240 @@
 package com.example.moneymate.ui.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.moneymate.data.local.CategoryEntity
+import com.example.moneymate.domain.model.Category
+import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.viewmodel.CategoryViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import rememberCategoryIcon
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CategoryManagementScreen(
     navController: NavController,
-    type: String, // Nhận vào: "SPEND" hoặc "INCOME" (hoặc "CHI PHÍ" / "THU NHẬP")
+    initialType: String = "SPEND",
     viewModel: CategoryViewModel = hiltViewModel()
 ) {
-    val categories by viewModel.getCategoriesByType(type).collectAsState(initial = emptyList())
-    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // TỐI ƯU 1: Đồng bộ chuẩn hóa dữ liệu đầu vào tránh lỗi lệch màu
-    val isSpend = remember(type) {
-        type.contains("SPEND", ignoreCase = true) || type.contains("CHI", ignoreCase = true)
-    }
-    val themeColor = remember(isSpend) { if (isSpend) Color(0xFF4B8361) else Color(0xFF2E5B8B) }
-    val displayName = remember(isSpend) { if (isSpend) "CHI PHÍ" else "THU NHẬP" }
+    // Lấy dữ liệu từ database Room thông qua ViewModel
+    val allEntities by viewModel.allCategories.collectAsState(initial = emptyList())
 
-    // State lưu danh sách đã được phân giải sẵn ID của Icon ở luồng nền
-    var optimizedCategories by remember { mutableStateOf<List<Pair<CategoryEntity, Int>>>(emptyList()) }
-
-    // TỐI ƯU 2: Phân giải tên Icon (String) sang Res ID (Int) ở Background Thread
-    LaunchedEffect(categories) {
-        withContext(Dispatchers.Default) {
-            categories.map { category ->
-                val resId = context.resources.getIdentifier(
-                    category.iconResName,
-                    "drawable",
-                    context.packageName
+    // Chuyển đổi Entity sang Domain Model để vẽ UI
+    val allCategories by remember(allEntities) {
+        derivedStateOf {
+            allEntities.map { entity ->
+                Category(
+                    id = entity.categoryId,
+                    title = entity.title,
+                    iconResName = entity.iconResName,
+                    colorHex = entity.colorHex,
+                    type = if (entity.type.toString().uppercase() == "INCOME") TransactionType.INCOME else TransactionType.SPEND,
+                    isDefault = entity.isDefault
                 )
-                Pair(category, resId)
             }
-        }.let {
-            optimizedCategories = it
         }
     }
+
+    val spendList = remember(allCategories) { allCategories.filter { it.type == TransactionType.SPEND } }
+    val incomeList = remember(allCategories) { allCategories.filter { it.type == TransactionType.INCOME } }
+
+    val tabs = listOf("CHI PHÍ", "THU NHẬP")
+    val pagerState = rememberPagerState(initialPage = if (initialType == "INCOME") 1 else 0) { tabs.size }
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = null,
-                    modifier = Modifier.clickable { navController.popBackStack() }
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text("Quản lý danh mục $displayName", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
+            TopAppBar(
+                title = { Text("Danh mục", color = Color.White, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E352F))
+            )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("add_category/$type") },
-                containerColor = themeColor
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-            }
-        }
+        containerColor = Color(0xFF141F1B)
     ) { padding ->
-        if (optimizedCategories.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Chưa có danh mục nào cho $displayName", color = Color.Gray)
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(16.dp)
+        Column(modifier = Modifier.padding(padding)) {
+            // --- THANH CHUYỂN TAB ---
+            TabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = Color(0xFF1E352F),
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                        color = Color(0xFF4CB080)
+                    )
+                },
+                divider = {}
             ) {
-                // TỐI ƯU 3: Thêm key cố định từ ID thực tế của Database
-                items(
-                    items = optimizedCategories,
-                    key = { pair -> pair.first.categoryId }
-                ) { (category, resId) ->
-                    CategoryItemForEntity(
-                        category = category,
-                        resId = resId,
-                        themeColor = themeColor,
-                        onClick = { /* Xử lý edit/delete tại đây */ }
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                        text = {
+                            Text(
+                                title,
+                                color = if (pagerState.currentPage == index) Color.White else Color.Gray,
+                                fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     )
                 }
+            }
+
+            // --- NỘI DUNG VUỐT PAGER ---
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                val currentList = if (page == 0) spendList else incomeList
+                val currentType = if (page == 0) "SPEND" else "INCOME"
+
+                CategoryGrid(
+                    categories = currentList,
+                    onCategoryClick = { selectedCategory ->
+                        // 🟢 ĐÃ SỬA: Đẩy trực tiếp thông tin phần tử được chọn vào SavedStateHandle của màn AddScreen trước đó
+                        navController.previousBackStackEntry?.savedStateHandle?.let { handle ->
+                            handle["selected_category_id"] = selectedCategory.id
+                            handle["selected_category_title"] = selectedCategory.title
+                            handle["selected_category_icon"] = selectedCategory.iconResName
+                            handle["selected_category_color"] = selectedCategory.colorHex
+                        }
+
+                        // Quay trở lại màn hình AddScreen
+                        navController.popBackStack()
+                    },
+                    onAddClick = {
+                        navController.navigate("add_category/$currentType")
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun CategoryItemForEntity(
-    category: CategoryEntity,
-    resId: Int,
-    themeColor: Color,
-    onClick: () -> Unit
+fun CategoryGrid(
+    categories: List<Category>,
+    onCategoryClick: (Category) -> Unit,
+    onAddClick: () -> Unit
 ) {
-    // TỐI ƯU 4: Cache mã màu Hex bằng remember để loại bỏ việc parse chuỗi liên tục khi cuộn
-    val itemColor = remember(category.colorHex) {
-        try {
-            Color(android.graphics.Color.parseColor(category.colorHex))
-        } catch (e: Exception) {
-            themeColor
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(4),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(categories) { category ->
+            CategoryItemView(
+                category = category,
+                modifier = Modifier.clickable { onCategoryClick(category) }
+            )
         }
+
+        // Nút bấm "Tạo" danh mục mới hình tròn màu vàng cuối lưới
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onAddClick() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .background(Color(0xFFFBC02D), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Tạo", color = Color.White, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryItemView(
+    category: Category,
+    modifier: Modifier = Modifier
+) {
+    val categoryColor = remember(category.colorHex) {
+        try { Color(android.graphics.Color.parseColor(category.colorHex)) }
+        catch (e: Exception) { Color(0xFF4CB080) }
     }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .padding(4.dp)
-            .clickable { onClick() }
+        modifier = modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(itemColor.copy(alpha = 0.1f)),
+                .size(60.dp)
+                .background(categoryColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            if (resId != 0) {
-                Icon(
-                    painter = painterResource(id = resId),
-                    contentDescription = null,
-                    tint = itemColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            } else {
-                Icon(Icons.Default.Bookmark, contentDescription = null, tint = itemColor)
-            }
+            Icon(
+                painter = rememberCategoryIcon(category.iconResName),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
         }
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = category.title,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(top = 4.dp),
-            maxLines = 1
+            color = Color.White,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

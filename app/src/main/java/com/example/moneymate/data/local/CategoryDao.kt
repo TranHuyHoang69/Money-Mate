@@ -10,11 +10,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDao {
-    @Query("SELECT * FROM categories ORDER BY title ASC")
-    fun getAllCategories(): Flow<List<CategoryEntity>>
 
-    @Query("SELECT * FROM categories WHERE type = :categoryType")
-    fun getCategoriesByType(categoryType: String): Flow<List<CategoryEntity>>
+    @Query("SELECT * FROM categories WHERE userId = :userId OR isDefault = 1 ORDER BY title ASC")
+    fun getAllCategoriesForUser(userId: String): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM categories WHERE type = :categoryType AND (userId = :userId OR isDefault = 1) ORDER BY title ASC")
+    fun getCategoriesByTypeAndUser(categoryType: String, userId: String): Flow<List<CategoryEntity>>
+
+    // 🟢 THÊM: Hàm tìm nhanh một danh mục dựa trên Tên và Loại của một User cụ thể
+    @Query("SELECT * FROM categories WHERE LOWER(title) = LOWER(:title) AND type = :type AND userId = :userId LIMIT 1")
+    suspend fun getCategoryByNameAndType(title: String, type: String, userId: String): CategoryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: CategoryEntity)
@@ -28,7 +33,6 @@ interface CategoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(categories: List<CategoryEntity>)
 
-    // 🟢 THÊM VÀO ĐÂY: Hàm giải phóng sạch bảng danh mục khi User thực hiện Logout hoặc Reset
     @Query("DELETE FROM categories")
     suspend fun clearAllCategories()
 }
