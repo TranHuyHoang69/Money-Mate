@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Info -->
+    <string name="app_name">MoneyMate</string>
+    <string name="app_slogan">Smart Finance Management</string>
+
+    <!-- Navigation Menu -->
+    <string name="menu_icon_desc">Menu</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_history">History</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_reminders">Reminders</string>
+    <string name="nav_security">Security Settings</string>
+    <string name="nav_customization">Customization</string>
+    <string name="nav_logout">Logout</string>
+    <string name="nav_login">Login</string>
+    <string name="nav_register">Register</string>
+
+    <!-- Home Screen -->
+    <string name="total_balance">TOTAL BALANCE</string>
+    <string name="expenses">EXPENSES</string>
+    <string name="income">INCOME</string>
+    <string name="no_transactions">No transactions</string>
+    <string name="transactions_count_format">%d transactions</string>
+    <string name="add_btn_desc">Add Transaction</string>
+
+    <!-- Time Periods -->
+    <string name="day">Day</string>
+    <string name="week">Week</string>
+    <string name="month">Month</string>
+    <string name="year">Year</string>
+    <string name="custom">Custom</string>
+
+    <!-- Add Transaction Screen -->
+    <string name="add_transaction">Add Transaction</string>
+    <string name="amount_label">Amount</string>
+    <string name="category_label">Category</string>
+    <string name="transaction_date">Transaction Date</string>
+    <string name="note_label">Note</string>
+    <string name="note_hint">Enter note...</string>
+    <string name="view_more">View more</string>
+    <string name="update_transaction">Update transaction</string>
+
+    <!-- Add Category Screen -->
+    <string name="new_category">New Category</string>
+    <string name="category_name_label">Category Name</string>
+    <string name="save_category">SAVE CATEGORY</string>
+    <string name="category_management">Category Management</string>
+    <string name="add_category">Add Category</string>
+    <string name="edit_category">Edit Category</string>
+    <string name="delete_category">Delete Category</string>
+    <string name="select_date_hint">Pick date</string>
+    <string name="error_format">Wrong format</string>
+    <string name="create">Create</string>
+
+
+
+    <!-- PIN Screens -->
+    <string name="setup_pin">Setup PIN</string>
+    <string name="change_pin">Change PIN</string>
+    <string name="delete_pin">Delete PIN</string>
+    <string name="enter_pin">Please enter PIN to continue</string>
+    <string name="re_enter_pin">Please re-enter PIN</string>
+    <string name="pin_mismatch">PIN does not match</string>
+    <string name="pin_too_short">PIN must be at least 4 digits</string>
+    <string name="enter_pin_hint">Please enter PIN to continue</string>
+    <string name="biometric_icon_desc">Biometric</string>
+    <string name="change_pin_success">Change PIN successfully</string>
+    <string name="enter_old_pin_hint">Enter old PIN</string>
+    <string name="enter_new_pin_hint">Enter new PIN</string>
+    <string name="confirm_new_pin_hint">Confirm new PIN</string>
+    <string name="pin_purpose_desc">This PIN is used to protect your MoneyMate account</string>
+    <string name="setup_pin_success">Setup successfully!</string>
+    <string name="delete_pin_success">Delete PIN successfully</string>
+    <string name="confirm_delete_pin_heading">Confirm delete PIN</string>
+    <string name="delete_pin_warning_desc">Please enter your current PIN to confirm this action.</string>
+    <!--DetailExpenseScreen -->
+    <string name="transaction_detail_title">Detail transaction</string>
+    <string name="currency_unit">đ</string>
+    <string name="type_spend">SPEND</string>
+    <string name="type_income">INCOME</string>
+    <string name="no_note_placeholder">No note</string>
+    <string name="transaction_not_found_error">Transaction not found</string>
+
+    <string name="label_amount">Amount</string>
+    <string name="label_category">Category</string>
+    <string name="label_type">Type</string>
+    <string name="label_time">Time</string>
+    <string name="label_note">Note</string>
+
+    <!--DetailListScreen -->
+    <string name="history_transaction_default_title">Transaction history</string>
+    <string name="type_spend_upper">SPEND</string>
+    <string name="type_income_upper">INCOME</string>
+
+    <string name="sort_prefix">Sort by:</string>
+    <string name="sort_by_time">Time</string>
+    <string name="sort_by_amount">Amount</string>
+    <string name="total_summary_label">Total</string>
+    <string name="no_data_placeholder">No data</string>
+
+    <string name="date_picker_range_title">Pick range date</string>
+    <string name="date_picker_range_headline">Pick start date - end date</string>
+    <string name="period_custom_range">Custom</string>
+
+    <!--GroupExpense -->
+    <string name="category_all">All</string>
+    <string name="total_prefix">Total:</string>
+    <string name="no_data_for_category_prefix">No data</string>
+
+    <string name="sort_latest">Newest</string>
+    <string name="sort_amount_desc_label">Amount desc</string>
+    <string name="sort_latest_with_desc">Newest(Time)</string>
+    <string name="sort_amount_desc_with_desc">Amount(desc)</string>
+
+
+    <!-- Auth Lock Screen -->
+    <string name="auth_title">Security Authentication</string>
+    <string name="auth_subtitle">Use fingerprint or face to unlock MoneyMate</string>
+    <string name="use_pin_fallback">Use PIN</string>
+    <string name="biometric_auth">Biometric Authentication</string>
+    <string name="use_fingerprint">Use fingerprint or face to activate</string>
+
+    <!-- Security Screen -->
+    <string name="security_settings">Security Settings</string>
+    <string name="enable_pin">Enable PIN</string>
+    <string name="disable_pin">Disable PIN</string>
+    <string name="enable_biometric">Enable Biometric Authentication</string>
+    <string name="disable_biometric">Disable Biometric Authentication</string>
+    <string name="pin_protection">PIN Protection</string>
+    <string name="biometric_protection">Biometric Protection</string>
+    <string name="security_use_biometric_title">Use Biometric</string>
+    <string name="security_use_biometric_subtitle">Unlock with fingerprint or face</string>
+    <string name="security_section_pin_title">PIN LOGIN</string>
+    <string name="security_setup_pin_title">Setup PIN</string>
+    <string name="security_setup_pin_subtitle">Protect your account with PIN</string>
+    <string name="security_change_pin_title">Change PIN</string>
+    <string name="security_change_pin_subtitle">Change current PIN</string>
+    <string name="security_delete_pin_title">Delete PIN</string>
+    <string name="security_delete_pin_subtitle">Remove PIN protection</string>
+    <string name="security_section_biometric_title">BIOMETRIC</string>
+    <string name="security_bio_prompt_title">Biometric Authentication</string>
+    <string name="security_bio_prompt_subtitle">Use fingerprint or face to activate</string>
+    <string name="security_bio_icon_desc">Biometric</string>
+    <string name="navigation_arrow_desc">View details</string>
+
+    <!-- Login Screen -->
+    <string name="email_label">Email</string>
+    <string name="email_hint">example@gmail.com</string>
+    <string name="password_label">Password</string>
+    <string name="password_hint">Enter password</string>
+    <string name="login_btn">Login</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="no_account">Don\'t have an account? Register now</string>
+    <string name="login_with_google">Login with Google</string>
+    <string name="login_slogan">Smart Finance - The future is now</string>
+    <string name="login_welcome_title">Welcome back!</string>
+    <string name="or_separator">Or</string>
+    <string name="toggle_password_visibility_desc">Toggle password visibility</string>
+    <string name="continue_with_google_btn">Continue with Google</string>
+
+
+
+    <!-- Register Screen -->
+    <string name="username_label">Username</string>
+    <string name="username_hint">Enter username</string>
+    <string name="register_btn">Register</string>
+    <string name="already_account">Already have an account? Login</string>
+    <string name="password_confirm">Confirm Password</string>
+    <string name="password_not_match">Passwords do not match</string>
+    <string name="register_header_title">Create an account</string>
+    <string name="register_slogan">Start your financial journey</string>
+    <string name="register_btn_upper">REGISTER NOW</string>
+
+
+    <!-- Profile Screen -->
+    <string name="profile_title">Profile</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="user_info">User Information</string>
+    <string name="account_settings">Account Settings</string>
+    <string name="logout_confirm">Are you sure you want to logout?</string>
+    <string name="delete_account">Delete Account</string>
+    <string name="delete_account_confirm">Deleting your account will erase all data. Are you sure?</string>
+    <string name="profile_username_label">Username</string>
+    <string name="profile_email_label">Email</string>
+    <string name="profile_delete_success_toast">Account deleted successfully</string>
+    <string name="profile_delete_failure_toast">Please login again before performing this action!</string>
+    <string name="profile_delete_confirm_btn_upper">DELETE ACCOUNT</string>
+    <string name="profile_default_username">MoneyMate User</string>
+    <string name="profile_default_email">No email</string>
+
+
+    <!-- Reminder Screen -->
+    <string name="reminder_title">Reminders</string>
+    <string name="add_reminder">Add Reminder</string>
+    <string name="edit_reminder">Edit Reminder</string>
+    <string name="delete_reminder">Delete Reminder</string>
+    <string name="reminder_name">Reminder Name</string>
+    <string name="reminder_name_hint">Enter reminder name</string>
+    <string name="reminder_note">Note</string>
+    <string name="reminder_note_hint">Enter note (optional)</string>
+    <string name="repeat_type">Repeat Type</string>
+    <string name="repeat_once">Once</string>
+    <string name="repeat_daily">Daily</string>
+    <string name="repeat_weekly">Weekly</string>
+    <string name="repeat_monthly">Monthly</string>
+    <string name="set_reminder_time">Set Reminder Time</string>
+    <string name="save_reminder">Save Reminder</string>
+    <plurals name="reminder_selected_count">
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="reminder_delete_selected_desc">Delete all selected items</string>
+    <string name="reminder_empty_list_hint">No reminder list</string>
+    <string name="reminder_date_time_pattern">d \'tháng\' M, yyyy HH:mm</string>
+    <string name="reminder_date_icon_desc">Date</string>
+
+    <!--UpdateReminder-->
+    <string name="update_reminder_header_title">Update Reminder</string>
+    <string name="reminder_title_label">Reminder Name</string>
+    <string name="reminder_title_placeholder">Name</string>
+    <string name="reminder_repeat_label">Repeat Reminder</string>
+    <string name="reminder_date_label">Date</string>
+    <string name="reminder_time_label">Time</string>
+    <string name="reminder_note_label">Note</string>
+    <string name="reminder_note_placeholder">Note</string>
+    <string name="reminder_save_changes_btn">Save Changes</string>
+    <string name="reminder_time_picker_title">Pick Reminder Time</string>
+    <string name="confirm_action_text_upper">CONFIRM</string>
+    <string name="cancel_action_text_upper">CANCEL</string>
+    <string name="back_btn_desc">Back</string>
+    <string name="reminder_date_pattern">d \'month\' M, yyyy</string>
+    <string-array name="reminder_repeat_options">
+        <item>Once</item>
+        <item>Daily</item>
+        <item>Weekly</item>
+        <item>Every 2 weeks</item>
+        <item>Every 4 weeks</item>
+        <item>Monthly</item>
+        <item>Every 2 months</item>
+        <item>Quarterly</item>
+        <item>Every 6 months</item>
+        <item>Yearly</item>
+    </string-array>
+
+
+    <!-- Customization Screen -->
+    <string name="customization_title">Customization</string>
+    <string name="app_language">APP LANGUAGE</string>
+    <string name="current_language">Current language</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_english">English</string>
+    <string name="theme_settings">SYSTEM THEME</string>
+    <string name="light_mode">Light Mode</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="system_default">System Default</string>
+
+    <!-- Buttons & Actions -->
+    <string name="save_btn">Save</string>
+    <string name="cancel_btn">Cancel</string>
+    <string name="delete_btn">Delete</string>
+    <string name="edit_btn">Edit</string>
+    <string name="add_btn">Add</string>
+    <string name="back_btn">Back</string>
+    <string name="confirm_btn">Confirm</string>
+    <string name="continue_btn">Continue</string>
+    <string name="ok_btn">OK</string>
+    <string name="yes_btn">Yes</string>
+    <string name="no_btn">No</string>
+
+    <!-- Error Messages -->
+    <string name="error_required">This field is required</string>
+    <string name="error_invalid_email">Invalid email address</string>
+    <string name="error_network">Network error</string>
+    <string name="error_unknown">An error occurred</string>
+    <string name="error_auth_failed">Authentication failed</string>
+    <string name="error_load_data">Failed to load data</string>
+    <string name="error_save_data">Failed to save data</string>
+
+    <!-- Success Messages -->
+    <string name="success_saved">Saved successfully</string>
+    <string name="success_deleted">Deleted successfully</string>
+    <string name="success_updated">Updated successfully</string>
+    <string name="success_logout">Logged out successfully</string>
+
+    <!-- Lists & Items -->
+    <string name="transactions_count">%d transactions</string>
+    <string name="empty_list">Empty list</string>
+    <string name="loading">Loading...</string>
+
+    <!-- Date/Time -->
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="this_week">This week</string>
+    <string name="last_week">Last week</string>
+    <string name="this_month">This month</string>
+    <string name="last_month">Last month</string>
+
+    <!-- Format strings -->
+    <string name="currency_format">₫%,.0f</string>
+    <string name="date_format">MM/dd/yyyy</string>
+    <string name="time_format">hh:mm a</string>
+
+    <!--Others -->
+    <string name="lang_vi">Vietnamese</string>
+    <string name="lang_en">English</string>
+
+    <string name="theme_light">Light mode</string>
+    <string name="theme_dark">Dark mode</string>
+    <string name="theme_system">Default system</string>
+    <string name="error">Error</string>
+
+</resources>
