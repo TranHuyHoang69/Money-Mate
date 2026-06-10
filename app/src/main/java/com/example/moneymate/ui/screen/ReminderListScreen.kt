@@ -31,6 +31,7 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -45,16 +46,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.moneymate.StringRes
 import com.example.moneymate.data.local.ReminderEntity
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.ReminderViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,20 +75,19 @@ fun ReminderListScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFF131A05),
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            // Ẩn nút Thêm khi đang trong chế độ chọn nhiều để tránh xung đột trải nghiệm
             if (!isMultiSelectMode) {
                 FloatingActionButton(
                     onClick = onAddReminderClick,
-                    containerColor = Color(0xFFFFC107),
-                    contentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer, // ✅ Loại bỏ màu vàng nạp cứng, sử dụng Tertiary tương thích theme
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     shape = RoundedCornerShape(100.dp),
                     modifier = Modifier.size(64.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Thêm nhắc nhở",
+                        contentDescription = stringResource(StringRes.reminder_title), // ✅ Sửa lỗi compile nhãn id =
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -106,7 +108,7 @@ fun ReminderListScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            color = Color(0xFF2A1B1B), // Nền đỏ tối cảnh báo xóa
+                            color = MaterialTheme.colorScheme.primaryContainer, // ✅ Sử dụng Container hệ thống thay vì nạp cứng HEX
                             shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                         )
                         .padding(horizontal = 16.dp, vertical = 20.dp)
@@ -118,40 +120,47 @@ fun ReminderListScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { selectedReminderIds = emptySet() }) {
-                                Text("Hủy", color = Color.White, fontSize = 16.sp)
+                                Text(
+                                    text = stringResource(StringRes.cancel_btn), // ✅ Sửa lỗi compile nhãn id =
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 16.sp
+                                )
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(
-                                text = "Đã chọn ${selectedReminderIds.size}",
-                                color = Color.White,
+                                text = pluralStringResource(
+                                    StringRes.reminder_selected_count, // ✅ Sửa lỗi compile nhãn id =
+                                    selectedReminderIds.size,
+                                    selectedReminderIds.size
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
 
                         IconButton(onClick = {
-                            // Thực hiện xóa toàn bộ các mục đã được tích chọn
                             reminders.filter { it.id in selectedReminderIds }.forEach { reminder ->
                                 viewModel.deleteReminder(reminder)
                             }
-                            selectedReminderIds = emptySet() // Thoát chế độ chọn nhiều
+                            selectedReminderIds = emptySet()
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Xóa toàn bộ mục đã chọn",
-                                tint = Color(0xFFED5E5E),
+                                contentDescription = stringResource(StringRes.reminder_delete_selected_desc), // ✅ Sửa lỗi compile nhãn id =
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
                     }
                 }
             } else {
-                // Header bình thường lúc đầu
+                // Header trạng thái hiển thị bình thường ban đầu
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            color = Color(0xFF1E3E2F),
+                            color = MaterialTheme.colorScheme.primaryContainer, // ✅ Sử dụng Container hệ thống thay vì nạp cứng HEX
                             shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                         )
                         .padding(horizontal = 16.dp, vertical = 20.dp)
@@ -163,15 +172,15 @@ fun ReminderListScreen(
                         IconButton(onClick = onOpenDrawer) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White,
+                                contentDescription = stringResource(StringRes.menu_icon_desc), // ✅ Sửa lỗi compile nhãn id =
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = "Nhắc nhở",
-                            color = Color.White,
+                            text = stringResource(StringRes.reminder_title), // ✅ Sửa lỗi compile nhãn id =
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -179,7 +188,6 @@ fun ReminderListScreen(
                 }
             }
 
-            // Tạo khoảng trống đệm nhỏ cố định ngăn cách giữa Header và List Item đầu tiên
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- LIST REMINDERS ---
@@ -190,7 +198,10 @@ fun ReminderListScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "Chưa có danh sách nhắc nhở", color = Color.Gray)
+                    Text(
+                        text = stringResource(StringRes.reminder_empty_list_hint), // ✅ Sửa lỗi compile nhãn id =
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
                 }
             } else {
                 LazyColumn(
@@ -213,20 +224,17 @@ fun ReminderListScreen(
                             },
                             onItemClick = {
                                 if (isMultiSelectMode) {
-                                    // Đang trong chế độ chọn nhiều: Nhấn vào thì đảo ngược trạng thái Tích / Bỏ tích
                                     selectedReminderIds = if (isSelected) {
                                         selectedReminderIds - reminder.id
                                     } else {
                                         selectedReminderIds + reminder.id
                                     }
                                 } else {
-                                    // Chế độ bình thường: Nhấn vào điều hướng đến màn hình sửa
                                     navController.navigate("update_reminder_screen?reminderId=${reminder.id}")
                                 }
                             },
                             onItemLongClick = {
                                 if (!isMultiSelectMode) {
-                                    // Giữ lâu lần đầu: Kích hoạt chế độ chọn nhiều, tự động đưa ID này vào danh sách chọn
                                     selectedReminderIds = setOf(reminder.id)
                                 }
                             }
@@ -238,7 +246,7 @@ fun ReminderListScreen(
     }
 }
 
-// ==================== HÀM PHỤ VẼ ITEM DÒNG NHẮC NHỞ (ĐÃ UPDATE LONG CLICK) ====================
+// ==================== HÀM PHỤ VẼ ITEM DÒNG NHẮC NHỞ (ĐÃ ĐỒNG BỘ THEME) ====================
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReminderRowItem(
@@ -249,8 +257,11 @@ fun ReminderRowItem(
     onItemClick: () -> Unit,
     onItemLongClick: () -> Unit
 ) {
-    val formattedTime = remember(reminder.reminderDateTime) {
-        val sdf = SimpleDateFormat("d 'tháng' M, yyyy HH:mm", Locale("vi", "VN"))
+    val currentLocale = LocalConfiguration.current.locales[0]
+    val dateTimePattern = stringResource(StringRes.reminder_date_time_pattern) // ✅ Sửa lỗi compile nhãn id =
+
+    val formattedTime = remember(reminder.reminderDateTime, currentLocale, dateTimePattern) {
+        val sdf = SimpleDateFormat(dateTimePattern, currentLocale)
         sdf.format(Date(reminder.reminderDateTime))
     }
 
@@ -259,7 +270,11 @@ fun ReminderRowItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(
-                color = if (isSelected) Color(0xFF2C4E3A) else Color(0xFF262620) // Đổi nền khi dòng được chọn
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
             )
             .combinedClickable(
                 onClick = onItemClick,
@@ -268,26 +283,24 @@ fun ReminderRowItem(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 💥 CHỐT KIỂM SOÁT HOẠT HỌA: Hiện Checkbox khi vào trạng thái chọn nhiều
         AnimatedVisibility(visible = isMultiSelectMode) {
             Row {
                 Checkbox(
                     checked = isSelected,
                     onCheckedChange = { onItemClick() },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = Color(0xFFFFC107), // Màu vàng hổ phách đồng bộ
-                        uncheckedColor = Color.Gray
+                        checkedColor = MaterialTheme.colorScheme.primary, // ✅ Loại bỏ màu vàng nạp cứng ở Checkbox
+                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 Spacer(modifier = Modifier.width(12.dp))
             }
         }
 
-        // Cột hiển thị thông tin chữ
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = reminder.title,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -295,34 +308,30 @@ fun ReminderRowItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.DateRange,
-                    contentDescription = "Lịch hẹn",
-                    tint = Color.Gray,
+                    contentDescription = stringResource(StringRes.reminder_date_icon_desc), // ✅ Sửa lỗi compile nhãn id =
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = formattedTime,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }
         }
 
-        // Các nút chức năng điều khiển riêng lẻ (Tự động ẩn đi khi đang trong tiến trình chọn nhiều)
         AnimatedVisibility(visible = !isMultiSelectMode) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-
                 Spacer(modifier = Modifier.width(8.dp))
-
-                // Nút công tắc bật tắt trạng thái độc lập
                 Switch(
                     checked = reminder.isActive,
                     onCheckedChange = onCheckedChange,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = Color(0xFF4CB080),
-                        uncheckedThumbColor = Color.Gray,
-                        uncheckedTrackColor = Color(0xFF3A3A35)
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary, // ✅ Sử dụng màu tương phản của Primary thay cho White tĩnh
+                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
                 )
             }

@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.moneymate.data.local.ReminderEntity
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.repository.ReminderRepository
-import com.example.moneymate.util.AlarmScheduler // 👈 Thêm import này để quản lý Alarm ngầm
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -65,38 +64,26 @@ class ReminderViewModel @Inject constructor(
                 repeatInterval = repeat,
                 isActive = true
             )
+            // ✅ ĐÃ TỐI ƯU: repository.insertReminder ngầm định đã gọi AlarmScheduler.scheduleAlarm rồi
             repository.insertReminder(entity)
-            // Lưu ý: Nếu Repository của bạn chưa tự động gọi AlarmScheduler.scheduleAlarm ngầm bên trong,
-            // bạn có thể lấy kết quả trả về (ID) của bản ghi vừa tạo để kích hoạt đặt lịch tại đây.
         }
     }
 
     fun toggleReminder(reminder: ReminderEntity, isActive : Boolean){
         viewModelScope.launch {
+            // ✅ ĐÃ TỐI ƯU: Tầng repository.updateReminderStatus đã tự động phân phối
+            // AlarmScheduler.scheduleAlarm / cancelAlarm dựa theo biến isActive.
+            // Việc gỡ bỏ các dòng gọi Alarm trực tiếp tại đây giúp sửa lỗi truyền sai object cực kỳ sạch sẽ.
             repository.updateReminderStatus(reminder.id.toLong(), isActive)
-
-            // Xử lý bật/tắt báo thức hệ thống tương ứng với trạng thái Switch thay đổi
-            val updatedReminder = reminder.copy(isActive = isActive)
-            if (isActive) {
-                AlarmScheduler.scheduleAlarm(context, updatedReminder)
-            } else {
-                AlarmScheduler.cancelAlarm(context, updatedReminder)
-            }
         }
     }
-
-    // ==================== 🛠️ THÊM CÁC CHỨC NĂNG MỚI TẠI ĐÂY ====================
 
     /**
      * Xóa nhắc nhở khỏi database đồng thời hủy báo thức trên hệ thống Android
      */
     fun deleteReminder(reminder: ReminderEntity) {
         viewModelScope.launch {
-            // 1. Hủy lịch hẹn giờ chạy ngầm của Android trước
-            AlarmScheduler.cancelAlarm(context, reminder)
-
-            // 2. Tiến hành xóa bản ghi dưới Database cục bộ (Room)
-            // ⚠️ Lưu ý: Hãy đảm bảo Interface Repository của bạn đã viết hàm deleteReminder(reminder) này rồi nhé
+            // ✅ ĐÃ TỐI ƯU: Tầng repository.deleteReminder đã đảm nhận hủy báo thức ngầm bằng ID thích ứng.
             repository.deleteReminder(reminder)
         }
     }
@@ -106,19 +93,13 @@ class ReminderViewModel @Inject constructor(
      */
     fun updateReminder(reminder: ReminderEntity) {
         viewModelScope.launch {
-            // 1. Cập nhật vào cơ sở dữ liệu
+            // ✅ ĐÃ TỐI ƯU: Tầng repository.updateReminder đã lo toàn bộ việc cập nhật DB local, remote
+            // cũng như đồng bộ tái đặt lịch mốc thời gian mới trên AlarmManager.
             repository.updateReminder(reminder)
-
-            // 2. Đồng bộ lại lịch hẹn giờ hệ thống: Nếu đang bật (Active) thì cập nhật giờ mới, ngược lại thì hủy lịch cũ đi
-            if (reminder.isActive) {
-                AlarmScheduler.scheduleAlarm(context, reminder)
-            } else {
-                AlarmScheduler.cancelAlarm(context, reminder)
-            }
         }
     }
+
     fun getReminderById(id: Int): Flow<ReminderEntity?> {
-        // Lưu ý: Đảm bảo Repository của bạn đã có hàm getReminderByIdLocal(id)
         return repository.getAllRemindersLocal(firebaseAuth.currentUser?.uid ?: "")
             .map { result ->
                 if (result is Result.Success) {

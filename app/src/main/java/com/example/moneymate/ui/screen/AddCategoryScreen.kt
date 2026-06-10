@@ -27,7 +27,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
@@ -35,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +50,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.moneymate.StringRes
 import com.example.moneymate.data.local.CategoryEntity
 import com.example.moneymate.ui.item.IconItem
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.ui.utils.IconUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +72,6 @@ fun AddCategoryScreen(
         mutableStateOf(groupedIcons.values.firstOrNull()?.firstOrNull() ?: "")
     }
 
-    // TỐI ƯU 1: Định nghĩa danh sách Màu kèm mã Color đã parse sẵn, triệt tiêu việc lặp parse chuỗi bậy bạ
     val colorPalette = remember {
         listOf(
             "#4B8361", "#2E5B8B", "#FFC107", "#E91E63", "#9C27B0", "#00BCD4",
@@ -82,14 +86,26 @@ fun AddCategoryScreen(
         catch (e: Exception) { Color(0xFF4B8361) }
     }
 
+    // Tự động tính toán màu chữ tương phản dựa trên màu nền của TopAppBar (Tránh chữ trắng trên nền vàng nhạt)
+    val appBarContentColor = contentColorFor(backgroundColor = themeColor)
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Danh mục mới", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
+                title = {
+                    Text(
+                        text = stringResource(StringRes.new_category), // ✅ Loại bỏ 'id =' để khớp signature mới
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = appBarContentColor
+                    )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, null, tint = appBarContentColor)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColor) // ✅ Đồng bộ màu động theo danh mục
             )
         }
     ) { padding ->
@@ -97,11 +113,10 @@ fun AddCategoryScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(Color(0xFFF8F9FA))
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // TỐI ƯU 2: Hợp nhất toàn bộ màn hình vào một LazyVerticalGrid duy nhất (Né triệt để lỗi Crash lồng nhau)
             LazyVerticalGrid(
-                columns = GridCells.Fixed(6), // Quy chuẩn hàng dọc 6 cột (Bảng màu vừa khít, Icon chiếm span hợp lý)
+                columns = GridCells.Fixed(6),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -112,9 +127,17 @@ fun AddCategoryScreen(
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Tên danh mục") },
+                        label = { Text(text = stringResource(StringRes.category_name_label)) }, // ✅ Fix compile
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                            focusedLabelColor = themeColor,
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedBorderColor = themeColor,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
                     )
                 }
 
@@ -127,24 +150,46 @@ fun AddCategoryScreen(
                         RadioButton(
                             selected = selectedType == "SPEND",
                             onClick = { selectedType = "SPEND" },
-                            colors = RadioButtonDefaults.colors(selectedColor = themeColor)
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = themeColor,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
-                        Text("Chi phí", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        Text(
+                            text = stringResource(StringRes.expenses), // ✅ Fix compile
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
 
                         Spacer(modifier = Modifier.width(24.dp))
 
                         RadioButton(
                             selected = selectedType == "INCOME",
                             onClick = { selectedType = "INCOME" },
-                            colors = RadioButtonDefaults.colors(selectedColor = themeColor)
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = themeColor,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
-                        Text("Thu nhập", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        Text(
+                            text = stringResource(StringRes.income), // ✅ Fix compile
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 }
 
                 // --- TIÊU ĐỀ MÀU SẮC ---
                 item(span = { GridItemSpan(6) }, key = "color_title") {
-                    Text("Màu sắc chủ đạo", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
+                    Text(
+                        text = stringResource(StringRes.theme_settings), // ✅ Fix compile
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
                 }
 
                 // --- BẢNG HIỂN THỊ MÀU (6 Cột) ---
@@ -162,7 +207,7 @@ fun AddCategoryScreen(
                             .clickable { selectedColor = colorHex }
                             .border(
                                 width = if (isColorSelected) 3.dp else 0.dp,
-                                color = if (isColorSelected) Color.Black else Color.Transparent,
+                                color = if (isColorSelected) MaterialTheme.colorScheme.onBackground else Color.Transparent,
                                 shape = CircleShape
                             )
                     )
@@ -171,17 +216,16 @@ fun AddCategoryScreen(
                 // --- TIÊU ĐỀ BIỂU TƯỢNG ---
                 item(span = { GridItemSpan(6) }, key = "icon_title") {
                     Text(
-                        text = "Biểu tượng danh mục",
+                        text = stringResource(StringRes.category_management), // ✅ Fix compile
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)
                     )
                 }
 
-                // TỐI ƯU 3: Triển khai phẳng cấu trúc dữ liệu Icon lồng nhau thông qua cơ chế DSL chuẩn của Compose
+                // Cấu trúc dữ liệu phân nhóm Icon phẳng DSL
                 groupedIcons.forEach { (groupName, iconsInGroup) ->
-                    // Vẽ Header phân nhóm Icon trải dài hết 6 cột
                     item(
                         span = { GridItemSpan(6) },
                         key = "header_group_$groupName"
@@ -195,7 +239,6 @@ fun AddCategoryScreen(
                         )
                     }
 
-                    // Vẽ các Icon item chiếm tỷ lệ cột tương ứng (Ở đây ta gán mỗi icon chiếm 1 cột trên tổng 6 cột)
                     items(
                         items = iconsInGroup,
                         key = { iconName -> "icon_${groupName}_$iconName" }
@@ -219,7 +262,7 @@ fun AddCategoryScreen(
             // --- NÚT LƯU DANH MỤC ---
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 8.dp
             ) {
                 Button(
@@ -227,7 +270,7 @@ fun AddCategoryScreen(
                         onSave(
                             CategoryEntity(
                                 categoryId = 0L,
-                                userId = "guest", // 🟢 ĐÃ SỬA: Gán chuỗi tạm để thoả mãn constructor. ViewModel/Repository sẽ tự động override bằng UID thật từ FirebaseAuth
+                                userId = "guest",
                                 title = name.trim(),
                                 iconResName = selectedIcon,
                                 colorHex = selectedColor,
@@ -244,7 +287,12 @@ fun AddCategoryScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = themeColor),
                     enabled = name.isNotBlank() && selectedIcon.isNotBlank()
                 ) {
-                    Text("LƯU DANH MỤC", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text(
+                        text = stringResource(StringRes.save_category), // ✅ Fix compile
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = appBarContentColor
+                    )
                 }
             }
         }

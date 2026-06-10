@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,9 +50,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.moneymate.StringRes       // ✅ Bộ quản lý ID tài nguyên chuỗi tập trung
 import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.item.ExpenseItem
+import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.SortType
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +63,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Khởi tạo một bản duy nhất để dùng lại, né việc new liên tục trong vòng lặp gây rác bộ nhớ (GC)
 private val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 private val timeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault())
 
@@ -75,20 +77,20 @@ fun GroupedExpenseScreen(
     val expenses by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
 
-
-
     var showSortMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
-    val themeColor = Color(0xFF4B8361)
 
-    // State lưu trữ dữ liệu sau khi đã gộp nhóm ở background
+    // Đồng bộ dải màu theo chuẩn token Material 3 động thay vì nạp cứng mã màu HEX
+    val themeColor = MaterialTheme.colorScheme.primary
+
     var groupedExpensesState by remember { mutableStateOf<Map<String, List<Expense>>>(emptyMap()) }
 
-    // Tối ưu 1: Chuyển toàn bộ logic Filter, Group, Format Date xuống Background Thread
-    LaunchedEffect(expenses, categoryName, historyViewModel.currentSortType) {
+    val allCategoriesLabel = stringResource(StringRes.category_all) // ✅ Sửa lỗi compile nhãn id =
+
+    LaunchedEffect(expenses, categoryName, historyViewModel.currentSortType, allCategoriesLabel) {
         withContext(Dispatchers.Default) {
-            val filteredByCategory = if (categoryName == "Tất cả") {
+            val filteredByCategory = if (categoryName == allCategoriesLabel) {
                 expenses
             } else {
                 expenses.filter { it.category.title == categoryName }
@@ -98,6 +100,8 @@ fun GroupedExpenseScreen(
             groupedExpensesState = it
         }
     }
+
+    val currencyUnit = stringResource(StringRes.currency_unit) // ✅ Sửa lỗi compile nhãn id =
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -110,28 +114,36 @@ fun GroupedExpenseScreen(
                         historyViewModel.loadCustomRange(start, end)
                     }
                     showDatePicker = false
-                }) { Text("Xác nhận", color = themeColor) }
+                }) { Text(text = stringResource(StringRes.confirm_btn), color = themeColor) } // ✅ Sửa lỗi compile nhãn id =
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Hủy") }
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
+                }
             }
         ) {
             DateRangePicker(
                 state = dateRangePickerState,
                 modifier = Modifier.weight(1f),
-                title = { Text("Chọn khoảng thời gian", Modifier.padding(16.dp)) }
+                title = { Text(text = stringResource(StringRes.date_picker_range_title), modifier = Modifier.padding(16.dp)) } // ✅ Sửa lỗi compile nhãn id =
             )
         }
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(text = categoryName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Tổng: ${String.format("%,.0f", totalAmount)} đ",
+                            text = categoryName,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface // ✅ Sửa màu Text theo hệ thống thích ứng Dark Mode
+                        )
+                        Text(
+                            text = "${stringResource(StringRes.total_prefix)} ${String.format("%,.0f", totalAmount)} $currencyUnit", // ✅ Sửa lỗi compile nhãn id =
                             fontSize = 14.sp,
                             color = themeColor,
                             fontWeight = FontWeight.Medium
@@ -140,10 +152,14 @@ fun GroupedExpenseScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = stringResource(StringRes.back_btn), // ✅ Sửa lỗi compile nhãn id =
+                            tint = MaterialTheme.colorScheme.onSurface // ✅ Sửa màu Icon theo hệ thống thích ứng Dark Mode
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface) // ✅ Đổi màu nền thanh công cụ thích ứng hệ thống
             )
         }
     ) { padding ->
@@ -151,24 +167,19 @@ fun GroupedExpenseScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(Color(0xFFF8F9FA))
         ) {
-// ✅ ĐOẠN CODE ĐÃ SỬA ĐỔI TOÀN DIỆN TẠI DÒNG 115 ĐỂ ĐỒNG BỘ VỚI VIEWMODEL
             CompactTimeNavigation(
-                currentMode = historyViewModel.calendarMode, // Đồng bộ biến Mode
-                displayTime = historyViewModel.getDisplayTime(), // Gọi hàm lấy chuỗi thời gian hiển thị
-                isNextEnabled = historyViewModel.isNextEnabled(), // Kiểm tra chặn nút tiến tương lai
-                onModeChange = { newMode ->
-                    // Ép kiểu hoặc truyền trực tiếp CalendarMode từ enum của bạn
-                    historyViewModel.changeMode(newMode)
-                },
-                onPrevious = { historyViewModel.movePrevious() }, // Gọi đúng hàm lùi thời gian
-                onNext = { historyViewModel.moveNext() },         // Gọi đúng hàm tiến thời gian
+                currentMode = historyViewModel.calendarMode,
+                displayTime = historyViewModel.getDisplayTime(),
+                isNextEnabled = historyViewModel.isNextEnabled(),
                 themeColor = themeColor,
+                onModeChange = { newMode -> historyViewModel.changeMode(newMode) },
+                onPrevious = { historyViewModel.movePrevious() },
+                onNext = { historyViewModel.moveNext() },
                 onRangeClick = { showDatePicker = true }
             )
 
-            // Spinner Sắp xếp
+            // Bộ Spinner Sắp xếp dữ liệu
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -178,30 +189,45 @@ fun GroupedExpenseScreen(
                 Surface(
                     onClick = { showSortMenu = true },
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color.LightGray.copy(0.5f)),
-                    color = Color.White
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    color = MaterialTheme.colorScheme.surface
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // ✅ i18n: Nhãn trạng thái bộ lọc sắp xếp hiện tại (Sửa lỗi nhãn id =)
                         val sortLabel = if (historyViewModel.currentSortType == SortType.TIME_DESC)
-                            "Mới nhất" else "Giá tiền giảm"
-                        Text(text = "Sắp xếp: $sortLabel", fontSize = 12.sp)
-                        Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(20.dp))
+                            stringResource(StringRes.sort_latest) else stringResource(StringRes.sort_amount_desc_label)
+                        Text(
+                            text = "${stringResource(StringRes.sort_prefix)} $sortLabel", // ✅ Sửa lỗi compile nhãn id =
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
 
-                DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                // Thực đơn lựa chọn thả xuống
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
                     DropdownMenuItem(
-                        text = { Text("Mới nhất (Thời gian)") },
+                        text = { Text(text = stringResource(StringRes.sort_latest_with_desc), color = MaterialTheme.colorScheme.onSurface) }, // ✅ Sửa lỗi compile nhãn id =
                         onClick = {
                             historyViewModel.updateSortType(SortType.TIME_DESC)
                             showSortMenu = false
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Số tiền (Giảm dần)") },
+                        text = { Text(text = stringResource(StringRes.sort_amount_desc_with_desc), color = MaterialTheme.colorScheme.onSurface) }, // ✅ Sửa lỗi compile nhãn id =
                         onClick = {
                             historyViewModel.updateSortType(SortType.AMOUNT_DESC)
                             showSortMenu = false
@@ -216,45 +242,45 @@ fun GroupedExpenseScreen(
                 }
             } else if (groupedExpensesState.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Không có dữ liệu cho $categoryName", color = Color.Gray)
+                    Text(
+                        text = "${stringResource(StringRes.no_data_for_category_prefix)} $categoryName", // ✅ Sửa lỗi compile nhãn id =
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             } else {
-                // Tối ưu 2: Trải phẳng cấu trúc danh sách để tái trưng dụng View chuẩn chỉ
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     groupedExpensesState.forEach { (date, items) ->
-                        // Header hiển thị Ngày tháng
                         item(key = "header_$date", contentType = "HeaderDate") {
                             Text(
                                 text = date,
                                 modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        // Bao bọc danh sách các Item bên trong Card bằng việc dùng itemsIndexed lồng an toàn
                         item(key = "card_$date", contentType = "GroupCard") {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                             ) {
                                 Column {
                                     items.forEachIndexed { index, expense ->
-                                        // Ghi nhận thời gian định dạng mượt mà
                                         val formattedTime = remember(expense.timestamp) {
                                             timeFormatter.format(Date(expense.timestamp))
                                         }
 
                                         Box(modifier = Modifier.clickable {
-                                            // ✅ ĐÃ SỬA: Lấy chuỗi firestoreDocId thay thế cho id kiểu Long
                                             val docId = expense.firestoreDocId
                                             if (docId.isNotEmpty()) {
                                                 navController.navigate("detail_expense/$docId")
@@ -265,7 +291,7 @@ fun GroupedExpenseScreen(
                                             ExpenseItem(
                                                 title = expense.category.title,
                                                 percent = formattedTime,
-                                                amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} đ",
+                                                amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} $currencyUnit",
                                                 color = Color(android.graphics.Color.parseColor(expense.category.colorHex))
                                             )
                                         }
@@ -274,7 +300,7 @@ fun GroupedExpenseScreen(
                                             HorizontalDivider(
                                                 modifier = Modifier.padding(horizontal = 16.dp),
                                                 thickness = 0.5.dp,
-                                                color = Color(0xFFF1F3F5)
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                                             )
                                         }
                                     }

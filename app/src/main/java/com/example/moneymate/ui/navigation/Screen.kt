@@ -20,5 +20,11 @@ sealed class Screen(val route: String){
     object Reminder: Screen("reminder")
     object ReminderAdd : Screen("reminder_add")
     object Profile: Screen("profile")
-
+    object SecuritySettings : Screen("security_settings")
+    object CreatePin : Screen("create_pin")
+    object ChangePin : Screen("change_pin")
+    object DeletePin : Screen("delete_pin")
+    object AuthLock : Screen("auth_lock")
+    object Splash : Screen("splash")
+    object Customization : Screen("customization")
 }

@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,9 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.moneymate.StringRes
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.ui.theme.stringResource // ✅ Sử dụng hàm dịch i18n custom chính xác
 import com.example.moneymate.viewmodel.AddExpenseEvent
 import com.example.moneymate.viewmodel.AddExpenseUiEvent
 import com.example.moneymate.viewmodel.AddExpenseViewModel
@@ -51,6 +54,17 @@ fun UpdateScreen(
 ) {
     val state = viewModel.uiState
     val context = LocalContext.current
+
+    // ✅ ĐÃ SỬA: Đưa TOÀN BỘ các hàm stringResource lên scope gốc cao nhất của Composable
+    val spendTypeText = stringResource(StringRes.type_spend_upper)
+    val incomeTypeText = stringResource(StringRes.type_income_upper)
+    val updateTitleText = stringResource(StringRes.update_transaction)
+    val addTitleText = stringResource(StringRes.add_transaction)
+    val backBtnDescText = stringResource(StringRes.back_btn_desc)
+
+    val amountLabelText = stringResource(StringRes.amount_label)      // "Số tiền"
+    val categoryLabelText = stringResource(StringRes.category_label)  // "Danh mục"
+    val confirmActionText = stringResource(StringRes.confirm_action_text_upper) // "XÁC NHẬN"
 
     LaunchedEffect(firestoreDocId) {
         if (firestoreDocId.isNotEmpty()) {
@@ -68,26 +82,56 @@ fun UpdateScreen(
         }
     }
 
+    val colorScheme = MaterialTheme.colorScheme
+
+// ✅ Dùng biến colorScheme thuần bên trong remember mà không lo bị lỗi ngữ cảnh
     val themeColor = remember(state.selectedType) {
-        if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
+        if (state.selectedType == TransactionType.SPEND) {
+            colorScheme.primary
+        } else {
+            colorScheme.tertiary
+        }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F9FA))) {
+    val contentColorOnTheme = remember(state.selectedType) {
+        if (state.selectedType == TransactionType.SPEND) {
+            colorScheme.onPrimary
+        } else {
+            colorScheme.onTertiary
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         HeaderUpdate(
             themeColor = themeColor,
+            contentColor = contentColorOnTheme,
             selectedType = state.selectedType,
             onTabSelected = { viewModel.onEvent(AddExpenseEvent.ChangeType(it)) },
             onBack = { navController.popBackStack() },
-            isEditMode = firestoreDocId.isNotEmpty()
+            isEditMode = firestoreDocId.isNotEmpty(),
+            spendTypeText = spendTypeText,
+            incomeTypeText = incomeTypeText,
+            updateTitleText = updateTitleText,
+            addTitleText = addTitleText,
+            backBtnDescText = backBtnDescText
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
             contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
         ) {
-            // 1. Ô Nhập số tiền (Đồng bộ UI với AddScreen)
+            // 1. Ô Nhập số tiền
             item(key = "amount_input") {
-                Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Text(
+                    text = amountLabelText, // ✅ Dùng biến chuỗi thuần thay vì gọi hàm Composable ở đây
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 AmountInputField(
                     amount = state.amount,
@@ -97,9 +141,14 @@ fun UpdateScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // 2. Phần Danh Mục Giao Dịch (Hiển thị tối đa 8 item, ẩn nút Xem thêm)
+            // 2. Phần Danh Mục Giao Dịch
             item(key = "category_section") {
-                Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Text(
+                    text = categoryLabelText, // ✅ Dùng biến chuỗi thuần thay vì gọi hàm Composable ở đây
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.height(12.dp))
 
                 when (val categoriesResult = state.categories) {
@@ -121,7 +170,7 @@ fun UpdateScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // 3. Khối thông tin bổ sung & duy nhất một nút XÁC NHẬN lớn
+            // 3. Khối thông tin bổ sung & Nút XÁC NHẬN
             item(key = "additional_details") {
                 TransactionDetailsCard(
                     selectedDate = state.selectedDate,
@@ -135,15 +184,21 @@ fun UpdateScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn khối Row chia tỉ lệ nút Xóa, đưa nút Xác Nhận về full màn hình giống AddScreen
                 Button(
                     onClick = { viewModel.onEvent(AddExpenseEvent.Save) },
                     modifier = Modifier.fillMaxWidth().height(60.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColor),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = themeColor,
+                        contentColor = contentColorOnTheme
+                    ),
                     enabled = state.amount.isNotBlank() && state.selectedCategory != null
                 ) {
-                    Text("XÁC NHẬN", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text(
+                        text = confirmActionText, // ✅ Dùng biến chuỗi thuần thay vì gọi hàm Composable ở đây
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
                 }
             }
         }
@@ -153,10 +208,16 @@ fun UpdateScreen(
 @Composable
 fun HeaderUpdate(
     themeColor: Color,
+    contentColor: Color,
     selectedType: TransactionType,
     onTabSelected: (TransactionType) -> Unit,
     onBack: () -> Unit,
-    isEditMode: Boolean
+    isEditMode: Boolean,
+    spendTypeText: String,
+    incomeTypeText: String,
+    updateTitleText: String,
+    addTitleText: String,
+    backBtnDescText: String
 ) {
     Column(
         modifier = Modifier
@@ -167,13 +228,15 @@ fun HeaderUpdate(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Default.ArrowBack, null, tint = Color.White,
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = backBtnDescText,
+                tint = contentColor,
                 modifier = Modifier.size(28.dp).clickable { onBack() }
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
-                text = if (isEditMode) "Cập nhật giao dịch" else "Thêm giao dịch",
-                color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold
+                text = if (isEditMode) updateTitleText else addTitleText,
+                color = contentColor, fontSize = 20.sp, fontWeight = FontWeight.Bold
             )
         }
 
@@ -183,21 +246,28 @@ fun HeaderUpdate(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(0.15f))
+                .background(contentColor.copy(alpha = 0.15f))
                 .padding(4.dp)
         ) {
-            listOf(TransactionType.SPEND to "CHI PHÍ", TransactionType.INCOME to "THU NHẬP").forEach { (type, title) ->
+            val typeTabs = remember(spendTypeText, incomeTypeText) {
+                listOf(
+                    TransactionType.SPEND to spendTypeText,
+                    TransactionType.INCOME to incomeTypeText
+                )
+            }
+
+            typeTabs.forEach { (type, title) ->
                 val isSelected = selectedType == type
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color.White.copy(0.25f) else Color.Transparent)
+                        .background(if (isSelected) contentColor.copy(alpha = 0.25f) else Color.Transparent)
                         .clickable { onTabSelected(type) }
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = title,
-                        color = if (isSelected) Color.White else Color.White.copy(0.6f),
+                        color = if (isSelected) contentColor else contentColor.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Bold, fontSize = 13.sp
                     )
                 }

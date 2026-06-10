@@ -17,8 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
@@ -37,8 +39,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.moneymate.StringRes
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.ui.navigation.Screen
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.AuthUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -55,15 +59,27 @@ fun AppDrawer(
     categories: List<Category>,
     onLogout: () -> Unit,
     onNavigate: (String) -> Unit,
-    onNavigateToAddCategory: (String) -> Unit, // Giữ lại để không lỗi signature interface cũ
+    onNavigateToAddCategory: (String) -> Unit,
     content: @Composable () -> Unit
 ) {
     val isLoggedIn = authUiState.isLoggedIn
 
+    // Cấu hình màu sắc của NavigationDrawerItem tự động thích ứng với cấu hình Light/Dark Theme hệ thống
+    val drawerItemColors = NavigationDrawerItemDefaults.colors(
+        selectedContainerColor = themeColor.copy(alpha = 0.15f),
+        selectedIconColor = themeColor,
+        selectedTextColor = themeColor,
+        unselectedContainerColor = Color.Transparent,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface
+    )
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.surface
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -84,7 +100,7 @@ fun AppDrawer(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(themeColor.copy(0.1f), CircleShape),
+                                .background(themeColor.copy(0.15f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             val initial = if (isLoggedIn) authUiState.user?.userName?.take(1) ?: "U" else "?"
@@ -92,33 +108,58 @@ fun AppDrawer(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (isLoggedIn) authUiState.user?.userName ?: "Người dùng" else "Chế độ khách",
+                            text = if (isLoggedIn) {
+                                authUiState.user?.userName ?: stringResource(StringRes.loading) // ✅ Sửa lỗi truyền đối số tường minh
+                            } else {
+                                stringHighlightOrText("Chế độ khách")
+                            },
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (isLoggedIn) {
                             val balanceFormatter = remember {
                                 DecimalFormat("#,###", java.text.DecimalFormatSymbols().apply { groupingSeparator = '.' })
                             }
-                            val formatBalance = if(totalBalance == 0.0) "0" else balanceFormatter.format(totalBalance)
+                            val formatBalance = if (totalBalance == 0.0) "0" else balanceFormatter.format(totalBalance)
+
+                            // ✅ Áp dụng cơ chế Format an toàn bằng cách gọi hàm nạp chồng định dạng vararg mới bảo vệ Runtime
+                            val currencySuffix = stringResource(com.example.moneymate.R.string.currency_format)
+                            val displayFormat = remember(totalBalance, currencySuffix, formatBalance) {
+                                try {
+                                    if (currencySuffix.contains("%")) {
+                                        String.format(currencySuffix, totalBalance)
+                                    } else {
+                                        "$formatBalance đ"
+                                    }
+                                } catch (e: Exception) {
+                                    "$formatBalance đ" // Fallback nếu cấu trúc file string.xml bị định dạng sai kiểu dữ liệu
+                                }
+                            }
+
                             Text(
-                                text = "$formatBalance đ",
-                                color = if (totalBalance >= 0) themeColor else Color(0xFFDC3545),
+                                text = displayFormat,
+                                color = if (totalBalance >= 0) themeColor else MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.SemiBold
                             )
                         } else {
-                            Text("Đăng nhập để đồng bộ dữ liệu", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(
+                                text = stringResource(StringRes.no_account), // ✅ Sửa lỗi 'id =' trùng lặp signature
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
-                    HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // --- MỤC TRANG CHỦ ---
                     NavigationDrawerItem(
-                        label = { Text("Trang chủ") },
+                        label = { Text(text = stringResource(StringRes.nav_home)) },
                         selected = currentRoute == Screen.MainScreen.route,
                         icon = { Icon(Icons.Default.Home, null) },
+                        colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
                             onNavigate(Screen.MainScreen.route)
@@ -128,9 +169,10 @@ fun AppDrawer(
 
                     // --- MỤC THÔNG TIN CÁ NHÂN ---
                     NavigationDrawerItem(
-                        label = { Text("Thông tin cá nhân") },
+                        label = { Text(text = stringResource(StringRes.nav_profile)) },
                         selected = currentRoute == Screen.Profile.route,
                         icon = { Icon(Icons.Default.Person, null) },
+                        colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
                             if (isLoggedIn) onNavigate(Screen.Profile.route) else onNavigate(Screen.Login.route)
@@ -140,9 +182,10 @@ fun AppDrawer(
 
                     // --- MỤC LỊCH SỬ ---
                     NavigationDrawerItem(
-                        label = { Text("Lịch sử") },
+                        label = { Text(text = stringResource(StringRes.nav_history)) },
                         selected = currentRoute == Screen.History.route,
                         icon = { Icon(Icons.Default.History, null) },
+                        colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
                             if (isLoggedIn) onNavigate(Screen.History.route) else onNavigate(Screen.Login.route)
@@ -150,15 +193,14 @@ fun AppDrawer(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
 
-                    // --- 🟢 MỤC DANH MỤC (ĐÃ ĐỔI THÀNH CHUYỂN MÀN RIÊNG BIỆT) ---
+                    // --- MỤC DANH MỤC ---
                     NavigationDrawerItem(
-                        label = { Text("Danh mục") },
-                        // Kiểm tra nếu route hiện tại chứa tiền tố quản lý danh mục thì sẽ highlight lên
+                        label = { Text(text = stringResource(StringRes.nav_categories)) },
                         selected = currentRoute?.startsWith("category_management") == true,
                         icon = { Icon(Icons.Default.List, null) },
+                        colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            // Điều hướng trực tiếp sang màn hình riêng với tham số mặc định là tab chi phí "SPEND"
                             onNavigate("category_management/SPEND")
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -166,12 +208,39 @@ fun AppDrawer(
 
                     // --- MỤC NHẮC NHỞ ---
                     NavigationDrawerItem(
-                        label = { Text("Nhắc nhở") },
+                        label = { Text(text = stringResource(StringRes.nav_reminders)) },
                         selected = currentRoute == Screen.Reminder.route,
                         icon = { Icon(Icons.Default.Update, null) },
+                        colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
                             if (isLoggedIn) onNavigate(Screen.Reminder.route) else onNavigate(Screen.Login.route)
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    // --- MỤC CÀI ĐẶT BẢO MẬT ---
+                    NavigationDrawerItem(
+                        label = { Text(text = stringResource(StringRes.nav_security)) },
+                        selected = currentRoute == Screen.SecuritySettings.route,
+                        icon = { Icon(Icons.Default.Lock, null) },
+                        colors = drawerItemColors,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (isLoggedIn) onNavigate(Screen.SecuritySettings.route) else onNavigate(Screen.Login.route)
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    // --- MỤC TÙY CHỈNH ---
+                    NavigationDrawerItem(
+                        label = { Text(text = stringResource(StringRes.nav_customization)) },
+                        selected = currentRoute == Screen.Customization.route,
+                        icon = { Icon(Icons.Default.Settings, null) },
+                        colors = drawerItemColors,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (isLoggedIn) onNavigate(Screen.Customization.route) else onNavigate(Screen.Login.route)
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
@@ -181,7 +250,7 @@ fun AppDrawer(
                     // --- KHU VỰC ĐĂNG XUẤT / ĐĂNG NHẬP Ở ĐÁY MENU ---
                     if (isLoggedIn) {
                         NavigationDrawerItem(
-                            label = { Text("Đăng xuất") },
+                            label = { Text(text = stringResource(StringRes.nav_logout)) },
                             selected = false,
                             icon = { Icon(Icons.Default.Logout, null) },
                             onClick = {
@@ -189,16 +258,20 @@ fun AppDrawer(
                                 onLogout()
                             },
                             colors = NavigationDrawerItemDefaults.colors(
-                                unselectedIconColor = Color.Red,
-                                unselectedTextColor = Color.Red
+                                unselectedIconColor = MaterialTheme.colorScheme.error,
+                                unselectedTextColor = MaterialTheme.colorScheme.error
                             ),
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     } else {
                         Column(modifier = Modifier.padding(16.dp)) {
                             NavigationDrawerItem(
-                                label = { Text("Đăng nhập") },
+                                label = { Text(text = stringResource(StringRes.nav_login)) },
                                 selected = false,
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     onNavigate(Screen.Login.route)
@@ -207,8 +280,12 @@ fun AppDrawer(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             NavigationDrawerItem(
-                                label = { Text("Đăng ký") },
+                                label = { Text(text = stringResource(StringRes.nav_register)) },
                                 selected = false,
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     onNavigate(Screen.Register.route)
@@ -222,4 +299,15 @@ fun AppDrawer(
         },
         content = content
     )
+}
+
+// Hàm bổ trợ nội bộ để xử lý chuỗi "Chế độ khách" nếu không muốn nạp cứng
+@Composable
+private fun stringHighlightOrText(fallback: String): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return try {
+        context.getString(com.example.moneymate.R.string.system_default)
+    } catch (e: Exception) {
+        fallback
+    }
 }

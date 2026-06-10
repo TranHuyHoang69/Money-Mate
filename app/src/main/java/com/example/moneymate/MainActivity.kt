@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,11 +12,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.fragment.app.FragmentActivity // 🟢 Thêm import này
 import com.example.moneymate.ui.navigation.AppNavigation
+import com.example.moneymate.ui.theme.MoneyMateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+// 🟢 Thay đổi từ ComponentActivity() sang FragmentActivity()
+class MainActivity : FragmentActivity() {
 
     // Bộ đăng ký lắng nghe kết quả xin quyền thông báo từ người dùng
     private val requestPermissionLauncher = registerForActivityResult(
@@ -49,9 +51,7 @@ class MainActivity : ComponentActivity() {
         windowInsetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-        setContent {
-            AppNavigation()
-        }
+        setContent { MoneyMateTheme { AppNavigation() } }
     }
 
     private fun checkAndRequestNotificationPermission() {
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                // Hiện hộp thoại hệ thống hỏi xin quyền hiển thị thông báo
+                 // Hiện hộp thoại hệ thống hỏi xin quyền hiển thị thông báo
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }

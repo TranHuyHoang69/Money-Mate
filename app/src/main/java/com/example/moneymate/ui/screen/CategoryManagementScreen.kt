@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -21,18 +23,17 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -49,8 +50,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.moneymate.StringRes       // ✅ Bộ quản lý ID tài nguyên chuỗi tập trung
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
 import com.example.moneymate.viewmodel.CategoryViewModel
 import kotlinx.coroutines.launch
 import rememberCategoryIcon
@@ -60,7 +63,8 @@ import rememberCategoryIcon
 fun CategoryManagementScreen(
     navController: NavController,
     initialType: String = "SPEND",
-    viewModel: CategoryViewModel = hiltViewModel()
+    viewModel: CategoryViewModel = hiltViewModel(),
+    onOpenDrawer: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -86,44 +90,64 @@ fun CategoryManagementScreen(
     val spendList = remember(allCategories) { allCategories.filter { it.type == TransactionType.SPEND } }
     val incomeList = remember(allCategories) { allCategories.filter { it.type == TransactionType.INCOME } }
 
-    val tabs = listOf("CHI PHÍ", "THU NHẬP")
+    // ✅ i18n: Chuyển đổi mảng Tab cứng sang danh sách ID chuỗi để hỗ trợ đa ngôn ngữ linh hoạt
+    val tabs = remember { listOf(StringRes.expenses, StringRes.income) }
     val pagerState = rememberPagerState(initialPage = if (initialType == "INCOME") 1 else 0) { tabs.size }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Danh mục", color = Color.White, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = MaterialTheme.colorScheme.primaryContainer) // ✅ Thay đổi sang màu hệ thống
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+                    .height(56.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = stringResource(StringRes.menu_icon_desc), // ✅ Sửa lỗi compile nhãn id =
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E352F))
-            )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = stringResource(StringRes.category_management), // ✅ Sửa lỗi compile nhãn id =
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         },
-        containerColor = Color(0xFF141F1B)
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             // --- THANH CHUYỂN TAB ---
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
-                containerColor = Color(0xFF1E352F),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer, // ✅ Đồng bộ màu Container của Tab theo chuẩn M3
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                        color = Color(0xFF4CB080)
+                        color = MaterialTheme.colorScheme.primary // ✅ Thanh chỉ báo chạy theo màu primary hệ thống
                     )
                 },
                 divider = {}
             ) {
-                tabs.forEachIndexed { index, title ->
+                tabs.forEachIndexed { index, resId ->
                     Tab(
                         selected = pagerState.currentPage == index,
                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                         text = {
                             Text(
-                                title,
-                                color = if (pagerState.currentPage == index) Color.White else Color.Gray,
+                                text = stringResource(resId).uppercase(), // ✅ Sửa lỗi compile nhãn id =
+                                color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thích ứng DarkMode tốt hơn Gray cố định
                                 fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -139,15 +163,12 @@ fun CategoryManagementScreen(
                 CategoryGrid(
                     categories = currentList,
                     onCategoryClick = { selectedCategory ->
-                        // 🟢 ĐÃ SỬA: Đẩy trực tiếp thông tin phần tử được chọn vào SavedStateHandle của màn AddScreen trước đó
                         navController.previousBackStackEntry?.savedStateHandle?.let { handle ->
                             handle["selected_category_id"] = selectedCategory.id
                             handle["selected_category_title"] = selectedCategory.title
                             handle["selected_category_icon"] = selectedCategory.iconResName
                             handle["selected_category_color"] = selectedCategory.colorHex
                         }
-
-                        // Quay trở lại màn hình AddScreen
                         navController.popBackStack()
                     },
                     onAddClick = {
@@ -179,7 +200,7 @@ fun CategoryGrid(
             )
         }
 
-        // Nút bấm "Tạo" danh mục mới hình tròn màu vàng cuối lưới
+        // Nút bấm "Tạo" danh mục mới
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -188,13 +209,22 @@ fun CategoryGrid(
                 Box(
                     modifier = Modifier
                         .size(60.dp)
-                        .background(Color(0xFFFBC02D), CircleShape),
+                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape), // ✅ Đồng bộ Container nút Add theo M3 thay vì màu vàng cứng
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(StringRes.add_category), // ✅ Sửa lỗi compile nhãn id =
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Tạo", color = Color.White, fontSize = 13.sp)
+                Text(
+                    text = stringResource(StringRes.create), // ✅ Sửa lỗi compile nhãn id =
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 13.sp
+                )
             }
         }
     }
@@ -205,9 +235,11 @@ fun CategoryItemView(
     category: Category,
     modifier: Modifier = Modifier
 ) {
-    val categoryColor = remember(category.colorHex) {
+    val defaultCategoryColor = MaterialTheme.colorScheme.primary
+
+    val categoryColor = remember(category.colorHex, defaultCategoryColor) {
         try { Color(android.graphics.Color.parseColor(category.colorHex)) }
-        catch (e: Exception) { Color(0xFF4CB080) }
+        catch (e: Exception) { defaultCategoryColor }
     }
 
     Column(
@@ -230,7 +262,7 @@ fun CategoryItemView(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = category.title,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,

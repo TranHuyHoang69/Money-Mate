@@ -25,4 +25,6 @@ interface ReminderDao {
     // 🟢 BỔ SUNG HÀM NÀY: Giúp Repository tìm được thực thể Reminder hiện tại để cập nhật trạng thái switch toggle
     @Query("SELECT * FROM reminders WHERE id = :id")
     suspend fun getReminderById(id: Long): ReminderEntity?
+    @Query("SELECT * FROM reminders WHERE isActive = 1")
+    fun getAllActiveReminders(): List<ReminderEntity>
 }

@@ -29,6 +29,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource // Sử dụng chuẩn hàm dịch i18n
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.moneymate.StringRes
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
@@ -75,23 +78,22 @@ fun AddScreen(
 ) {
     val state = viewModel.uiState
 
-    val themeColor = remember(state.selectedType) {
-        if (state.selectedType == TransactionType.SPEND) Color(0xFF4B8361) else Color(0xFF2E5B8B)
-    }
+    // ✅ ĐÃ SỬA: Ép cứng màu xanh thương hiệu cố định cho thanh Header, giống hoàn toàn với UpdateScreen
+    val themeColor = remember { Color(0xFF006C4C) }
 
     // Luồng lắng nghe sự kiện Save thành công
     LaunchedEffect(key1 = Unit) {
         viewModel.eventFlow.collect { event ->
             android.util.Log.d("MONEYMATE_DEBUG", "Đã nhận sự kiện trên UI: $event")
             when(event){
-                is AddExpenseUiEvent.SaveSuccess ->{
+                is AddExpenseUiEvent.SaveSuccess -> {
                     navController.popBackStack()
                 }
             }
         }
     }
 
-    // 🟢 ĐÃ ĐỒNG BỘ: Lắng nghe và hứng dữ liệu danh mục truyền ngược về thông qua SavedStateHandle
+    // Luồng lắng nghe dữ liệu danh mục truyền ngược về thông qua SavedStateHandle
     val navBackStackEntry = navController.currentBackStackEntry
     LaunchedEffect(navBackStackEntry) {
         val savedStateHandle = navBackStackEntry?.savedStateHandle
@@ -111,10 +113,8 @@ fun AddScreen(
                 isDefault = false
             )
 
-            // Cập nhật danh mục vừa chọn vào ViewModel của màn AddScreen
             viewModel.onEvent(AddExpenseEvent.SelectCategory(returnedCategory))
 
-            // Xóa dữ liệu trong SavedStateHandle để tránh việc Recompose nhận lại dữ liệu cũ khi cấu hình thay đổi
             savedStateHandle.remove<Long>("selected_category_id")
             savedStateHandle.remove<String>("selected_category_title")
             savedStateHandle.remove<String>("selected_category_icon")
@@ -125,7 +125,7 @@ fun AddScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         HeaderAdd(
             themeColor = themeColor,
@@ -150,7 +150,19 @@ fun HeaderAdd(
     onTabSelected: (TransactionType) -> Unit,
     onBack: () -> Unit
 ) {
-    val options = remember { listOf(TransactionType.SPEND to "CHI PHÍ", TransactionType.INCOME to "THU NHẬP") }
+    // ✅ ĐÃ SỬA: Đưa việc giải mã chuỗi i18n ra scope Composable an toàn trước khi nạp vào vòng lặp
+    val expensesText = stringResource(id = StringRes.expenses).uppercase()
+    val incomeText = stringResource(id = StringRes.income).uppercase()
+    val backDescText = stringResource(id = StringRes.back_btn)
+    val addTransactionText = stringResource(id = StringRes.add_transaction)
+
+    val options = remember(expensesText, incomeText) {
+        listOf(
+            TransactionType.SPEND to expensesText,
+            TransactionType.INCOME to incomeText
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -161,14 +173,19 @@ fun HeaderAdd(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Default.ArrowBack,
-                contentDescription = null,
+                contentDescription = backDescText,
                 tint = Color.White,
                 modifier = Modifier
                     .size(28.dp)
                     .clickable { onBack() }
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Text("Thêm giao dịch", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = addTransactionText,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -180,7 +197,7 @@ fun HeaderAdd(
                 .background(Color.Black.copy(0.15f))
                 .padding(4.dp)
         ) {
-            options.forEach { (type, displayName) ->
+            options.forEach { (type, tabTitle) ->
                 val isSelected = selectedType == type
                 Box(
                     modifier = Modifier
@@ -190,7 +207,7 @@ fun HeaderAdd(
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = displayName,
+                        text = tabTitle,
                         color = if (isSelected) Color.White else Color.White.copy(0.6f),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -211,13 +228,19 @@ fun FormSection(
     val state = viewModel.uiState
     val context = LocalContext.current
 
+    // ✅ ĐÃ SỬA: Đưa toàn bộ các hàm stringResource lên đầu scope FormSection để bảo vệ tính đồng nhất của Context
+    val amountLabel = stringResource(id = StringRes.amount_label)
+    val categoryManagementLabel = stringResource(id = StringRes.category_management)
+    val confirmBtnText = stringResource(id = StringRes.confirm_btn).uppercase()
+    val viewMoreText = stringResource(id = StringRes.view_more)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp)
     ) {
-        // Phần nhập tiền
+        // 1. Phần nhập tiền
         item(key = "amount_input") {
-            Text("Số tiền", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+            Text(text = amountLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))
             AmountInputField(
                 amount = state.amount,
@@ -227,9 +250,9 @@ fun FormSection(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Phần danh mục
+        // 2. Phần danh mục
         item(key = "category_section") {
-            Text("Danh mục", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+            Text(text = categoryManagementLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
 
             when (val categoriesResult = state.categories) {
@@ -238,6 +261,7 @@ fun FormSection(
                         categories = categoriesResult.data,
                         themeColor = themeColor,
                         selectedCategory = state.selectedCategory,
+                        viewMoreText = viewMoreText, // Truyền chuỗi an toàn xuống dưới
                         onCategorySelect = { viewModel.onEvent(AddExpenseEvent.SelectCategory(it)) },
                         onSeeMoreClick = {
                             val encodedType = URLEncoder.encode(state.selectedType.name, "UTF-8")
@@ -255,7 +279,7 @@ fun FormSection(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Các phần còn lại (Ngày tháng, Ghi chú, Nút lưu)
+        // 3. Các phần còn lại (Ngày tháng, Ghi chú, Nút lưu)
         item(key = "additional_details") {
             TransactionDetailsCard(
                 selectedDate = state.selectedDate,
@@ -276,7 +300,7 @@ fun FormSection(
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor),
                 enabled = state.amount.isNotBlank() && state.selectedCategory != null
             ) {
-                Text("XÁC NHẬN", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text(text = confirmBtnText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
     }
@@ -287,6 +311,7 @@ fun CategoryGrid(
     categories: List<Category>,
     themeColor: Color,
     selectedCategory: Category?,
+    viewMoreText: String, // ✅ Đã sửa: Nhận String thuần từ trên truyền xuống
     onCategorySelect: (Category) -> Unit,
     onSeeMoreClick: () -> Unit
 ) {
@@ -297,10 +322,8 @@ fun CategoryGrid(
             val isAlreadyInTop7 = top7DefaultCategories.any { it.id == selectedCategory.id }
 
             if (isAlreadyInTop7) {
-                // 👉 Nếu có trong top 7 mặc định: Giữ nguyên vị trí cũ không đảo lên đầu
                 top7DefaultCategories
             } else {
-                // 👉 Nếu KHÔNG nằm trong top 7: Đưa lên vị trí đầu tiên (Index 0)
                 val remainingItems = top7DefaultCategories.take(6)
                 listOf(selectedCategory) + remainingItems
             }
@@ -308,7 +331,6 @@ fun CategoryGrid(
             top7DefaultCategories
         }
 
-        // Chia mảng thành các dòng, mỗi dòng 4 cột
         finalDisplayList.chunked(4)
     }
 
@@ -333,19 +355,21 @@ fun CategoryGrid(
                     }
                 }
 
-                // Xử lý dòng cuối cùng chứa nút "Xem thêm" nếu dòng đó chưa đủ 4 phần tử
                 if (rowIndex == gridRows.lastIndex && rowItems.size < 4) {
-                    Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        AddCategoryButton(viewMoreText, onSeeMoreClick)
+                    }
                     repeat(4 - rowItems.size - 1) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
 
-        // Nếu tổng danh mục lấy ra bằng 4 hoặc 8, nút "Xem thêm" tự nhảy xuống dòng mới riêng biệt
         val totalTaken = gridRows.flatten().size
         if (totalTaken > 0 && totalTaken % 4 == 0) {
             Row(modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { AddCategoryButton(onSeeMoreClick) }
+                Box(modifier = Modifier.weight(1f)) {
+                    AddCategoryButton(viewMoreText, onSeeMoreClick)
+                }
                 repeat(3) { Spacer(Modifier.weight(1f)) }
             }
         }
@@ -355,7 +379,7 @@ fun CategoryGrid(
 private fun Modifier.key(key: Any): Modifier = this
 
 @Composable
-fun AddCategoryButton(onClick: () -> Unit) {
+fun AddCategoryButton(viewMoreText: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -366,13 +390,13 @@ fun AddCategoryButton(onClick: () -> Unit) {
             modifier = Modifier
                 .size(60.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(Color.LightGray.copy(0.2f)),
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Default.Add, null, tint = Color.Gray)
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Xem thêm", fontSize = 11.sp, color = Color.Gray)
+        Text(text = viewMoreText, fontSize = 11.sp, color = Color.Gray)
     }
 }
 
@@ -446,11 +470,15 @@ fun CategoryItem(
     }
 }
 
+// Hàm format ngày (giữ nguyên tính Composable hợp lệ)
+@Composable
 fun formatLongToDateString(timestamp: Long): String {
-    if (timestamp == 0L) return "Chọn ngày"
+    if (timestamp == 0L) return stringResource(id = StringRes.select_date_hint)
     return try {
         addScreenDateFormatter.format(Date(timestamp))
-    } catch (e: Exception) { "Sai định dạng" }
+    } catch (e: Exception) {
+        stringResource(id = StringRes.error_format)
+    }
 }
 
 fun showDatePicker(context: Context, onDateSelected: (Long) -> Unit) {
@@ -478,7 +506,7 @@ fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String)
         onValueChange = onAmountChange,
         modifier = Modifier.fillMaxWidth(),
         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = themeColor),
-        placeholder = { Text("0", fontSize = 28.sp, color = Color.LightGray) },
+        placeholder = { Text("0", fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
         trailingIcon = { Text("₫", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -496,9 +524,14 @@ fun TransactionDetailsCard(
     onDateClick: () -> Unit,
     onNoteChange: (String) -> Unit
 ) {
+    // ✅ ĐÃ SỬA: Bóc chuỗi i18n của Card lên trên scope an toàn của hàm
+    val transactionDateLabel = stringResource(id = StringRes.transaction_date)
+    val reminderNoteLabel = stringResource(id = StringRes.reminder_note)
+    val reminderNoteHint = stringResource(id = StringRes.reminder_note_hint)
+
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -509,19 +542,19 @@ fun TransactionDetailsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Ngày giao dịch", color = Color.Gray, fontSize = 14.sp)
-                    Text(formatLongToDateString(selectedDate), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(text = transactionDateLabel, color = Color.Gray, fontSize = 14.sp)
+                    Text(text = formatLongToDateString(selectedDate), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
                 Icon(Icons.Default.DateRange, null, tint = themeColor)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color(0xFFEEEEEE))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
 
-            Text("Ghi chú", color = Color.Gray, fontSize = 14.sp)
+            Text(text = reminderNoteLabel, color = Color.Gray, fontSize = 14.sp)
             OutlinedTextField(
                 value = note,
                 onValueChange = onNoteChange,
-                placeholder = { Text("Nhập ghi chú...") },
+                placeholder = { Text(text = reminderNoteHint) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent)
             )

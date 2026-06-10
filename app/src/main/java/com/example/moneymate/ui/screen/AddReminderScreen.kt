@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,12 +43,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.moneymate.StringRes
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.ReminderViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -59,16 +61,23 @@ fun AddReminderScreen(
     viewModel: ReminderViewModel,
     onBackClick: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     var title by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
 
+    // --- XỬ LÝ i18n CHO DANH SÁCH TẦN SUẤT ---
+    val repeatOptions = remember {
+        listOf(
+            "ONCE" to StringRes.repeat_once,
+            "DAILY" to StringRes.repeat_daily,
+            "WEEKLY" to StringRes.repeat_weekly,
+            "MONTHLY" to StringRes.repeat_monthly
+        )
+    }
+
     var repeatExpanded by remember { mutableStateOf(false) }
-    val repeatOptions = listOf(
-        "Một lần", "Hàng ngày", "Hàng tuần", "Mỗi 2 tuần",
-        "Mỗi 4 tuần", "Hàng tháng", "Mỗi 2 tháng", "Hàng quý",
-        "Mỗi 6 tháng", "Mỗi năm"
-    )
-    var repeatInterval by remember { mutableStateOf(repeatOptions[0]) }
+    var selectedRepeatKey by remember { mutableStateOf(repeatOptions[0].first) }
 
     val calendar = remember { Calendar.getInstance() }
     var selectedDate by remember { mutableStateOf(calendar.time) }
@@ -78,8 +87,14 @@ fun AddReminderScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    val dateDisplayString = remember(selectedDate) {
-        SimpleDateFormat("d 'tháng' M, yyyy", Locale("vi", "VN")).format(selectedDate)
+    // Đọc mẫu format ngày động từ strings.xml để phục vụ đa ngôn ngữ
+    val configDateFormat = stringResource(com.example.moneymate.R.string.date_format) // ✅ Sửa lỗi compile nhãn id =
+    val dateDisplayString = remember(selectedDate, configDateFormat) {
+        try {
+            SimpleDateFormat(configDateFormat, Locale.getDefault()).format(selectedDate)
+        } catch (e: Exception) {
+            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(selectedDate)
+        }
     }
 
     val timeDisplayString = remember(selectedHour, selectedMinute) {
@@ -97,7 +112,6 @@ fun AddReminderScreen(
                 TextButton(onClick = {
                     val selectedMillis = datePickerState.selectedDateMillis
                     if (selectedMillis != null) {
-                        // 💥 SỬA Ở ĐÂY: Chuyển đổi mốc UTC từ M3 DatePicker về đúng múi giờ hệ thống máy
                         val utcCalendar = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
                             timeInMillis = selectedMillis
                         }
@@ -108,12 +122,12 @@ fun AddReminderScreen(
                     }
                     showDatePicker = false
                 }) {
-                    Text("XÁC NHẬN", color = Color(0xFF4CB080))
+                    Text(text = stringResource(StringRes.confirm_btn), color = MaterialTheme.colorScheme.primary) // ✅ Sửa lỗi compile nhãn id =
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("HỦY", color = Color.Gray)
+                    Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
                 }
             }
         ) {
@@ -137,13 +151,18 @@ fun AddReminderScreen(
                     .fillMaxWidth()
                     .padding(16.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3E2F))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) // ✅ Đồng bộ màu Card theo Theme hệ thống
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Chọn giờ nhắc nhở", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = stringResource(StringRes.set_reminder_time), // ✅ Sửa lỗi compile nhãn id =
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
 
                     TimePicker(state = timePickerState)
@@ -154,14 +173,14 @@ fun AddReminderScreen(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { showTimePicker = false }) {
-                            Text("HỦY", color = Color.Gray)
+                            Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
                         }
                         TextButton(onClick = {
                             selectedHour = timePickerState.hour
                             selectedMinute = timePickerState.minute
                             showTimePicker = false
                         }) {
-                            Text("XÁC NHẬN", color = Color(0xFF4CB080))
+                            Text(text = stringResource(StringRes.confirm_btn), color = MaterialTheme.colorScheme.primary) // ✅ Sửa lỗi compile nhãn id =
                         }
                     }
                 }
@@ -171,7 +190,7 @@ fun AddReminderScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFF131A05)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -183,7 +202,7 @@ fun AddReminderScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFF1E3E2F),
+                        color = MaterialTheme.colorScheme.primaryContainer, // ✅ Sửa đổi sang màu primaryContainer hệ thống thay vì nạp cứng HEX
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     )
                     .padding(horizontal = 16.dp, vertical = 20.dp)
@@ -195,15 +214,15 @@ fun AddReminderScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Quay lại",
-                            tint = Color.White,
+                            contentDescription = stringResource(StringRes.back_btn), // ✅ Sửa lỗi compile nhãn id =
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "Tạo lời nhắc",
-                        color = Color.White,
+                        text = stringResource(StringRes.reminder_title), // ✅ Sửa lỗi compile nhãn id =
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -218,21 +237,21 @@ fun AddReminderScreen(
                     .padding(horizontal = 24.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Trường 1: Tên lời nhắc (Đã chuyển sang BasicTextField chống lỗi thư viện)
+                // Trường 1: Tên lời nhắc
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Tên lời nhắc", color = Color(0xFF8E8E93), fontSize = 16.sp)
+                    Text(text = stringResource(StringRes.reminder_name), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                     Spacer(modifier = Modifier.height(8.dp))
                     BasicTextField(
                         value = title,
                         onValueChange = { title = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+                        textStyle = TextStyle(color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp),
                         singleLine = true,
-                        cursorBrush = SolidColor(Color(0xFF4CB080)),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth(),
                         decorationBox = { innerTextField ->
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 if (title.isEmpty()) {
-                                    Text("Tên", color = Color(0xFF555A4F), fontSize = 18.sp)
+                                    Text(text = stringResource(StringRes.reminder_name_hint), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 18.sp) // ✅ Sửa lỗi compile nhãn id =
                                 } else {
                                     innerTextField()
                                 }
@@ -241,16 +260,16 @@ fun AddReminderScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(1.dp)
-                                        .background(if (title.isNotEmpty()) Color(0xFF4CB080) else Color(0xFF555A4F))
+                                        .background(if (title.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                                 )
                             }
                         }
                     )
                 }
 
-                // Trường 2: Tần suất nhắc nhở (Đã chuyển sang Custom Layout chống lỗi MenuAnchor)
+                // Trường 2: Tần suất nhắc nhở
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Tần suất nhắc nhở", color = Color(0xFF8E8E93), fontSize = 16.sp)
+                    Text(text = stringResource(StringRes.repeat_type), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Box(modifier = Modifier.fillMaxWidth()) {
@@ -264,7 +283,8 @@ fun AddReminderScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = repeatInterval, color = Color(0xFF4CB080), fontSize = 18.sp)
+                                val currentLabelRes = repeatOptions.find { it.first == selectedRepeatKey }?.second ?: StringRes.repeat_once
+                                Text(text = stringResource(currentLabelRes), color = MaterialTheme.colorScheme.primary, fontSize = 18.sp) // ✅ Sửa lỗi compile nhãn id =
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = repeatExpanded)
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -272,26 +292,26 @@ fun AddReminderScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(1.dp)
-                                    .background(Color(0xFF555A4F))
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                             )
                         }
 
                         DropdownMenu(
                             expanded = repeatExpanded,
                             onDismissRequest = { repeatExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.6f).background(Color(0xFF1E3E2F))
+                            modifier = Modifier.fillMaxWidth(0.6f).background(MaterialTheme.colorScheme.surface)
                         ) {
-                            repeatOptions.forEach { option ->
+                            repeatOptions.forEach { (optionKey, optionResId) ->
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = option,
-                                            color = if(option == repeatInterval) Color(0xFFFFC107) else Color.White,
+                                            text = stringResource(optionResId), // ✅ Sửa lỗi compile nhãn id =
+                                            color = if (optionKey == selectedRepeatKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             fontSize = 16.sp
                                         )
                                     },
                                     onClick = {
-                                        repeatInterval = option
+                                        selectedRepeatKey = optionKey
                                         repeatExpanded = false
                                     }
                                 )
@@ -306,9 +326,9 @@ fun AddReminderScreen(
                         .fillMaxWidth()
                         .clickable { showDatePicker = true }
                 ) {
-                    Text(text = "Ngày", color = Color(0xFF8E8E93), fontSize = 16.sp)
+                    Text(text = stringResource(com.example.moneymate.R.string.day), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = dateDisplayString, color = Color(0xFF4CB080), fontSize = 18.sp)
+                    Text(text = dateDisplayString, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
                 }
 
                 // Trường 4: Bộ chọn Giờ
@@ -317,25 +337,25 @@ fun AddReminderScreen(
                         .fillMaxWidth()
                         .clickable { showTimePicker = true }
                 ) {
-                    Text(text = "Giờ", color = Color(0xFF8E8E93), fontSize = 16.sp)
+                    Text(text = stringResource(com.example.moneymate.R.string.time_format), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = timeDisplayString, color = Color(0xFF4CB080), fontSize = 18.sp)
+                    Text(text = timeDisplayString, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
                 }
 
-                // Trường 5: Ghi chú (Đã chuyển sang BasicTextField chống lỗi thư viện)
+                // Trường 5: Ghi chú
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = "Ghi chú", color = Color(0xFF8E8E93), fontSize = 16.sp)
+                    Text(text = stringResource(StringRes.reminder_note), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                     Spacer(modifier = Modifier.height(8.dp))
                     BasicTextField(
                         value = note,
                         onValueChange = { note = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
-                        cursorBrush = SolidColor(Color(0xFF4CB080)),
+                        textStyle = TextStyle(color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth(),
                         decorationBox = { innerTextField ->
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 if (note.isEmpty()) {
-                                    Text("Ghi chú", color = Color(0xFF555A4F), fontSize = 18.sp)
+                                    Text(text = stringResource(StringRes.reminder_note_hint), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 18.sp) // ✅ Sửa lỗi compile nhãn id =
                                 } else {
                                     innerTextField()
                                 }
@@ -344,7 +364,7 @@ fun AddReminderScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(1.dp)
-                                        .background(if (note.isNotEmpty()) Color(0xFF4CB080) else Color(0xFF555A4F))
+                                        .background(if (note.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                                 )
                             }
                         }
@@ -362,44 +382,53 @@ fun AddReminderScreen(
                     onClick = {
                         val finalCalendar = Calendar.getInstance().apply {
                             val dateNav = Calendar.getInstance().apply { time = selectedDate }
-
-                            // Lấy chính xác Ngày - Tháng - Năm local
                             set(Calendar.YEAR, dateNav.get(Calendar.YEAR))
                             set(Calendar.MONTH, dateNav.get(Calendar.MONTH))
                             set(Calendar.DAY_OF_MONTH, dateNav.get(Calendar.DAY_OF_MONTH))
-
-                            // Ép đúng Giờ - Phút local
                             set(Calendar.HOUR_OF_DAY, selectedHour)
                             set(Calendar.MINUTE, selectedMinute)
                             set(Calendar.SECOND, 0)
                             set(Calendar.MILLISECOND, 0)
                         }
 
-                        // 💥 CHỐT CHẶN AN TOÀN TỐI CAO:
-                        // Nếu giờ đặt lịch bằng hoặc nhỏ hơn giờ hiện tại của máy (do quá vài giây), tự động cộng sang phút tiếp theo hoặc ngày tiếp theo
                         if (finalCalendar.timeInMillis <= System.currentTimeMillis()) {
                             finalCalendar.add(Calendar.MINUTE, 1)
                         }
+
+                        // Trích xuất ngôn ngữ thuần qua ngữ cảnh Context để lập lịch chính xác
+                        val currentLabelRes = repeatOptions.find { it.first == selectedRepeatKey }?.second ?: StringRes.repeat_once
+                        val localizedRepeatValue = context.getString(currentLabelRes)
 
                         viewModel.createReminder(
                             title = title,
                             note = note,
                             dateTime = finalCalendar.timeInMillis,
-                            repeat = repeatInterval
+                            repeat = localizedRepeatValue
                         )
                         onBackClick()
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(100.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFC107),
-                        contentColor = Color.Black
+                        containerColor = MaterialTheme.colorScheme.primary, // ✅ Chuyển sang nút màu chủ đạo của app thay vì gán cứng vàng hổ phách
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     enabled = title.isNotBlank()
                 ) {
-                    Text(text = "Tạo", fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                    Text(text = stringResource(StringRes.add_btn), fontSize = 20.sp, fontWeight = FontWeight.Medium) // ✅ Sửa lỗi compile nhãn id =
                 }
             }
         }
+    }
+}
+
+// Hàm bổ trợ đọc String an toàn qua Context thuần để tránh lỗi try-catch Composable
+@Composable
+private fun contextGetStringFallback(resId: Int): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return try {
+        context.getString(resId)
+    } catch (e: Exception) {
+        ""
     }
 }

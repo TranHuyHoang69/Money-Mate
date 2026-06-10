@@ -1,3 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App Info -->
     <string name="app_name">MoneyMate</string>
+    <string name="app_slogan">Quản lý tài chính thông minh</string>
+
+    <!-- Navigation Menu -->
+    <string name="menu_icon_desc">Menu</string>
+    <string name="nav_home">Trang chủ</string>
+    <string name="nav_profile">Thông tin cá nhân</string>
+    <string name="nav_history">Lịch sử</string>
+    <string name="nav_categories">Danh mục</string>
+    <string name="nav_reminders">Nhắc nhở</string>
+    <string name="nav_security">Cài đặt bảo mật</string>
+    <string name="nav_customization">Tùy chỉnh</string>
+    <string name="nav_logout">Đăng xuất</string>
+    <string name="nav_login">Đăng nhập</string>
+    <string name="nav_register">Đăng ký</string>
+
+    <!-- Home Screen -->
+    <string name="total_balance">TỔNG SỐ DƯ</string>
+    <string name="expenses">CHI PHÍ</string>
+    <string name="income">THU NHẬP</string>
+    <string name="no_transactions">Không có giao dịch nào</string>
+    <string name="transactions_count_format">%d giao dịch</string>
+    <string name="add_btn_desc">Thêm giao dịch mới</string>
+
+    <!-- Time Periods -->
+    <string name="day">Ngày</string>
+    <string name="week">Tuần</string>
+    <string name="month">Tháng</string>
+    <string name="year">Năm</string>
+    <string name="custom">Khoảng</string>
+
+    <!-- Add Transaction Screen -->
+    <string name="add_transaction">Thêm giao dịch</string>
+    <string name="amount_label">Số tiền</string>
+    <string name="category_label">Danh mục</string>
+    <string name="transaction_date">Ngày giao dịch</string>
+    <string name="note_label">Ghi chú</string>
+    <string name="note_hint">Nhập ghi chú...</string>
+    <string name="view_more">Xem thêm</string>
+
+    <!-- Add Category Screen -->
+    <string name="new_category">Danh mục mới</string>
+    <string name="category_name_label">Tên danh mục</string>
+    <string name="save_category">LƯU DANH MỤC</string>
+    <string name="category_management">Quản lý danh mục</string>
+    <string name="add_category">Thêm danh mục</string>
+    <string name="edit_category">Sửa danh mục</string>
+    <string name="delete_category">Xóa danh mục</string>
+    <string name="select_date_hint">Chọn ngày</string>
+    <string name="error_format">Sai định dạng</string>
+    <string name="create">Tạo</string>
+
+    <!-- PIN Screens -->
+    <string name="setup_pin">Thiết lập mã PIN</string>
+    <string name="change_pin">Đổi mã PIN</string>
+    <string name="delete_pin">Xóa mã PIN</string>
+    <string name="enter_pin">Vui lòng nhập mã PIN để tiếp tục ứng dụng</string>
+    <string name="re_enter_pin">Vui lòng nhập lại mã PIN</string>
+    <string name="pin_mismatch">Mã PIN không khớp</string>
+    <string name="pin_too_short">Mã PIN phải có ít nhất 4 chữ số</string>
+    <string name="change_pin_success">Đổi mã PIN thành công</string>
+    <string name="enter_old_pin_hint">Nhập mã PIN hiện tại</string>
+    <string name="enter_new_pin_hint">Nhập mã PIN mới</string>
+    <string name="confirm_new_pin_hint">Xác nhận mã PIN mới</string>
+    <string name="pin_purpose_desc">Mã PIN này dùng để bảo mật ứng dụng MoneyMate</string>
+    <string name="setup_pin_success">Thiết lập thành công!</string>
+    <string name="delete_pin_success">Xoá mã PIN thành công</string>
+    <string name="confirm_delete_pin_heading">Xác nhận xoá mã PIN</string>
+    <string name="delete_pin_warning_desc">Vui lòng nhập mã PIN hiện tại để xác thực hành động gỡ bỏ bảo mật này.</string>
+
+    <!-- Auth Lock Screen -->
+    <string name="auth_title">Xác thực bảo mật</string>
+    <string name="auth_subtitle">Sử dụng vân tay hoặc khuôn mặt để mở khóa MoneyMate</string>
+    <string name="use_pin_fallback">Sử dụng mã PIN</string>
+    <string name="biometric_auth">Xác thực sinh trắc học</string>
+    <string name="use_fingerprint">Sử dụng vân tay hoặc khuôn mặt để kích hoạt</string>
+    <string name="enter_pin_hint">Vui lòng nhập mã PIN để tiếp tục ứng dụng</string>
+    <string name="biometric_icon_desc">Sinh trắc học</string>
+
+    <!-- Security Screen -->
+    <string name="security_settings">Cài đặt bảo mật</string>
+    <string name="enable_pin">Bật mã PIN</string>
+    <string name="disable_pin">Tắt mã PIN</string>
+    <string name="enable_biometric">Bật xác thực sinh trắc học</string>
+    <string name="disable_biometric">Tắt xác thực sinh trắc học</string>
+    <string name="pin_protection">Bảo vệ bằng mã PIN</string>
+    <string name="biometric_protection">Bảo vệ bằng sinh trắc học</string>
+    <string name="security_use_biometric_title">Sử dụng sinh trắc học</string>
+    <string name="security_use_biometric_subtitle">Mở khóa nhanh bằng vân tay/khuôn mặt</string>
+    <string name="security_section_pin_title">MÃ PIN ĐĂNG NHẬP</string>
+    <string name="security_setup_pin_title">Thiết lập mã PIN</string>
+    <string name="security_setup_pin_subtitle">Bảo vệ ứng dụng của bạn bằng mã PIN</string>
+    <string name="security_change_pin_title">Đổi mã PIN</string>
+    <string name="security_change_pin_subtitle">Thay đổi mã PIN bảo mật hiện tại</string>
+    <string name="security_delete_pin_title">Xóa mã PIN</string>
+    <string name="security_delete_pin_subtitle">Gỡ bỏ hoàn toàn lớp bảo vệ bằng PIN</string>
+    <string name="security_section_biometric_title">SINH TRẮC HỌC</string>
+    <string name="security_bio_prompt_title">Xác thực sinh trắc học</string>
+    <string name="security_bio_prompt_subtitle">Sử dụng vân tay hoặc khuôn mặt để kích hoạt</string>
+    <string name="security_bio_icon_desc">Sinh trắc học</string>
+    <string name="navigation_arrow_desc">Xem chi tiết</string>
+
+    <!-- Login Screen -->
+    <string name="email_label">Email</string>
+    <string name="email_hint">example@gmail.com</string>
+    <string name="password_label">Mật khẩu</string>
+    <string name="password_hint">Nhập mật khẩu</string>
+    <string name="login_btn">Đăng nhập</string>
+    <string name="forgot_password">Quên mật khẩu?</string>
+    <string name="no_account">Chưa có tài khoản? Đăng ký ngay</string>
+    <string name="login_with_google">Đăng nhập với Google</string>
+    <string name="login_slogan">Quản lý thông minh - Tương lai vững chắc</string>
+    <string name="login_welcome_title">Chào mừng quay trở lại!</string>
+    <string name="or_separator">Hoặc</string>
+    <string name="toggle_password_visibility_desc">Chuyển đổi ẩn hiện mật khẩu</string>
+    <string name="continue_with_google_btn">Tiếp tục với Google</string>
+
+    <!-- Register Screen -->
+    <string name="username_label">Tên người dùng</string>
+    <string name="username_hint">Nhập tên người dùng</string>
+    <string name="register_btn">Đăng ký</string>
+    <string name="already_account">Đã có tài khoản? Đăng nhập</string>
+    <string name="password_confirm">Xác nhận mật khẩu</string>
+    <string name="password_not_match">Mật khẩu không khớp</string>
+    <string name="register_header_title">Tạo tài khoản</string>
+    <string name="register_slogan">Bắt đầu hành trình quản lý tài chính</string>
+    <string name="register_btn_upper">ĐĂNG KÝ NGAY</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_title">Thông tin cá nhân</string>
+    <string name="edit_profile">Sửa hồ sơ</string>
+    <string name="user_info">Thông tin người dùng</string>
+    <string name="account_settings">Cài đặt tài khoản</string>
+    <string name="logout_confirm">Bạn có chắc chắn muốn đăng xuất?</string>
+    <string name="delete_account">Xóa tài khoản</string>
+    <string name="delete_account_confirm">Xóa tài khoản sẽ mất tất cả dữ liệu. Bạn có chắc chắn?</string>
+    <string name="profile_username_label">Tên tài khoản</string>
+    <string name="profile_email_label">Địa chỉ Email</string>
+    <string name="profile_delete_success_toast">Đã xóa tài khoản thành công</string>
+    <string name="profile_delete_failure_toast">Vui lòng đăng nhập lại trước khi thực hiện hành động bảo mật này!</string>
+    <string name="profile_delete_confirm_btn_upper">XÓA VĨNH VIỄN</string>
+    <string name="profile_default_username">Người dùng MoneyMate</string>
+    <string name="profile_default_email">Chưa cập nhật Email</string>
+
+    <!-- Reminder Screen -->
+    <string name="reminder_title">Nhắc nhở</string>
+    <string name="add_reminder">Thêm nhắc nhở</string>
+    <string name="edit_reminder">Sửa nhắc nhở</string>
+    <string name="delete_reminder">Xóa nhắc nhở</string>
+    <string name="reminder_name">Tên nhắc nhở</string>
+    <string name="reminder_name_hint">Nhập tên nhắc nhở</string>
+    <string name="reminder_note">Ghi chú</string>
+    <string name="reminder_note_hint">Nhập ghi chú (tuỳ chọn)</string>
+    <string name="repeat_type">Loại lặp lại</string>
+    <string name="repeat_once">Một lần</string>
+    <string name="repeat_daily">Hàng ngày</string>
+    <string name="repeat_weekly">Hàng tuần</string>
+    <string name="repeat_monthly">Hàng tháng</string>
+    <string name="set_reminder_time">Đặt thời gian nhắc nhở</string>
+    <string name="save_reminder">Lưu nhắc nhở</string>
+    <plurals name="reminder_selected_count">
+        <item quantity="other">Đã chọn %1$d</item>
+    </plurals>
+    <string name="reminder_delete_selected_desc">Xóa toàn bộ mục đã chọn</string>
+    <string name="reminder_empty_list_hint">Chưa có danh sách nhắc nhở</string>
+    <string name="reminder_date_time_pattern">d \'tháng\' M, yyyy HH:mm</string>
+    <string name="reminder_date_icon_desc">Lịch hẹn</string>
+
+    <!-- UpdateReminder -->
+    <string name="update_reminder_header_title">Sửa lời nhắc</string>
+    <string name="reminder_title_label">Tên lời nhắc</string>
+    <string name="reminder_title_placeholder">Tên</string>
+    <string name="reminder_repeat_label">Tần suất nhắc nhở</string>
+    <string name="reminder_date_label">Ngày</string>
+    <string name="reminder_time_label">Giờ</string>
+    <string name="reminder_note_label">Ghi chú</string>
+    <string name="reminder_note_placeholder">Ghi chú</string>
+    <string name="reminder_save_changes_btn">Lưu thay đổi</string>
+    <string name="reminder_time_picker_title">Chọn giờ nhắc nhở</string>
+    <string name="reminder_date_pattern">d \'tháng\' M, yyyy</string>
+    <string name="confirm_action_text_upper">XÁC NHẬN</string>
+    <string name="cancel_action_text_upper">HỦY</string>
+    <string name="back_btn_desc">Quay lại</string>
+
+    <string-array name="reminder_repeat_options">
+        <item>Một lần</item>
+        <item>Hàng ngày</item>
+        <item>Hàng tuần</item>
+        <item>Mỗi 2 tuần</item>
+        <item>Mỗi 4 tuần</item>
+        <item>Hàng tháng</item>
+        <item>Mỗi 2 tháng</item>
+        <item>Hàng quý</item>
+        <item>Mỗi 6 tháng</item>
+        <item>Mỗi năm</item>
+    </string-array>
+
+    <!-- Customization Screen -->
+    <string name="customization_title">Tùy chỉnh</string>
+    <string name="app_language">NGÔN NGỮ ỨNG DỤNG</string>
+    <string name="current_language">Ngôn ngữ hiện tại</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_english">English</string>
+    <string name="theme_settings">GIAO DIỆN HỆ THỐNG</string>
+    <string name="light_mode">Chế độ sáng</string>
+    <string name="dark_mode">Chế độ tối</string>
+    <string name="system_default">Mặc định hệ thống</string>
+
+    <!-- Buttons & Actions -->
+    <string name="save_btn">Lưu</string>
+    <string name="cancel_btn">Hủy</string>
+    <string name="delete_btn">Xóa</string>
+    <string name="edit_btn">Sửa</string>
+    <string name="add_btn">Thêm</string>
+    <string name="back_btn">Quay lại</string>
+    <string name="confirm_btn">Xác nhận</string>
+    <string name="continue_btn">Tiếp tục</string>
+    <string name="ok_btn">OK</string>
+    <string name="yes_btn">Có</string>
+    <string name="no_btn">Không</string>
+
+    <!-- Error Messages -->
+    <string name="error_required">Trường này là bắt buộc</string>
+    <string name="error_invalid_email">Email không hợp lệ</string>
+    <string name="error_network">Lỗi kết nối mạng</string>
+    <string name="error_unknown">Đã xảy ra lỗi</string>
+    <string name="error_auth_failed">Xác thực thất bại</string>
+    <string name="error_load_data">Lỗi tải dữ liệu</string>
+    <string name="error_save_data">Lỗi lưu dữ liệu</string>
+
+    <!-- Success Messages -->
+    <string name="success_saved">Lưu thành công</string>
+    <string name="success_deleted">Xóa thành công</string>
+    <string name="success_updated">Cập nhật thành công</string>
+    <string name="success_logout">Đăng xuất thành công</string>
+
+    <!-- Lists & Items -->
+    <string name="transactions_count">%d giao dịch</string>
+    <string name="empty_list">Danh sách trống</string>
+    <string name="loading">Đang tải...</string>
+
+    <!-- Date/Time -->
+    <string name="today">Hôm nay</string>
+    <string name="yesterday">Hôm qua</string>
+    <string name="tomorrow">Ngày mai</string>
+    <string name="this_week">Tuần này</string>
+    <string name="last_week">Tuần trước</string>
+    <string name="this_month">Tháng này</string>
+    <string name="last_month">Tháng trước</string>
+
+    <!-- Format strings -->
+    <string name="currency_format">%,.0f đ</string>
+    <string name="date_format">dd/MM/yyyy</string>
+    <string name="time_format">HH:mm</string>
+
+    <!--DetailExpenseScreen -->
+    <string name="transaction_detail_title">Chi tiết giao dịch</string>
+    <string name="currency_unit">đ</string>
+    <string name="type_spend">Chi phí</string>
+    <string name="type_income">Thu nhập</string>
+    <string name="no_note_placeholder">Không có ghi chú</string>
+    <string name="transaction_not_found_error">Không tìm thấy thông tin giao dịch</string>
+    <string name="label_amount">Số tiền</string>
+    <string name="label_category">Danh mục</string>
+    <string name="label_type">Loại</string>
+    <string name="label_time">Thời gian</string>
+    <string name="label_note">Ghi chú</string>
+
+    <!--DetailListScreen -->
+    <string name="history_transaction_default_title">Lịch sử giao dịch</string>
+    <string name="type_spend_upper">CHI PHÍ</string>
+    <string name="type_income_upper">THU NHẬP</string>
+    <string name="sort_prefix">Sắp xếp:</string>
+    <string name="sort_by_time">Thời gian</string>
+    <string name="sort_by_amount">Số tiền</string>
+    <string name="total_summary_label">Tổng cộng</string>
+    <string name="no_data_placeholder">Không có dữ liệu</string>
+    <string name="date_picker_range_headline">Chọn ngày bắt đầu - kết thúc</string>
+    <string name="period_custom_range">Khoảng</string>
+
+    <!--GroupExpense -->
+    <string name="category_all">Tất cả</string>
+    <string name="total_prefix">Tổng:</string>
+    <string name="no_data_for_category_prefix">Không có dữ liệu cho</string>
+    <string name="sort_latest">Mới nhất</string>
+    <string name="sort_amount_desc_label">Giá tiền giảm</string>
+    <string name="sort_latest_with_desc">Mới nhất (Thời gian)</string>
+    <string name="sort_amount_desc_with_desc">Số tiền (Giảm dần)</string>
+    <string name="date_picker_range_title">Chọn khoảng thời gian</string>
+
+    <!--Others -->
+    <string name="lang_vi">Tiếng Việt</string>
+    <string name="lang_en">English</string>
+    <string name="theme_light">Chế độ sáng</string>
+    <string name="theme_dark">Chế độ tối</string>
+    <string name="theme_system">Mặc định hệ thống</string>
+    <string name="error">Lỗi</string>
+    <string name="update_transaction">Cập nhật giao dịch</string>
 </resources>

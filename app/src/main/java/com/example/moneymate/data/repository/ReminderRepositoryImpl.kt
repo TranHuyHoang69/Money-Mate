@@ -64,9 +64,10 @@ class ReminderRepositoryImpl @Inject constructor(
             reminderDao.updateReminder(updateReminder)
 
             if (isActive) {
-                AlarmScheduler.scheduleAlarm(context, updateReminder)
+                AlarmScheduler.scheduleAlarm(context, updateReminder) // ✅ Đúng: scheduleAlarm nhận object ReminderEntity
             } else {
-                AlarmScheduler.cancelAlarm(context, updateReminder)
+                // 🛠️ SỬA LỖI 1: cancelAlarm cần ID kiểu Int, truyền vào updateReminder.id thay vì truyền cả object
+                AlarmScheduler.cancelAlarm(context, updateReminder.id)
             }
 
             firestoreDataSource.saveReminderToRemote(updateReminder)
@@ -80,7 +81,8 @@ class ReminderRepositoryImpl @Inject constructor(
     // 🟢 Bỏ tham số Context, dùng biến `context` tiêm từ Hilt
     override suspend fun deleteReminder(reminder: ReminderEntity): Result<Unit> {
         return try {
-            AlarmScheduler.cancelAlarm(context, reminder)
+            // 🛠️ SỬA LỖI 2: cancelAlarm cần ID kiểu Int, truyền vào reminder.id thay vì truyền cả object
+            AlarmScheduler.cancelAlarm(context, reminder.id)
 
             reminderDao.deleteReminderById(reminder.id)
 
@@ -91,9 +93,20 @@ class ReminderRepositoryImpl @Inject constructor(
             Result.Error(e.message ?: "Lỗi khi xoá lời nhắc")
         }
     }
+
     override suspend fun updateReminder(reminder: ReminderEntity): Result<Unit> {
         return try {
-            reminderDao.updateReminder(reminder) // Hoặc tên hàm update trong Room DAO của bạn
+            reminderDao.updateReminder(reminder)
+
+            // 💡 GỢI Ý BỔ SUNG UX: Khi cập nhật thông tin chung của Lời nhắc (ví dụ thay đổi giờ giấc, chu kỳ),
+            // ta nên cập nhật lại cả lịch hẹn báo thức AlarmManager để nó đồng bộ mốc thời gian mới.
+            if (reminder.isActive) {
+                AlarmScheduler.scheduleAlarm(context, reminder)
+            } else {
+                AlarmScheduler.cancelAlarm(context, reminder.id)
+            }
+            firestoreDataSource.saveReminderToRemote(reminder)
+
             Result.Success(Unit)
         } catch (e: Exception) {
             Result.Error(e.message ?: "Lỗi khi cập nhật lời nhắc")

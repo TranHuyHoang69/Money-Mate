@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +49,7 @@ fun MorphingChartSection(
         modifier = Modifier
             .fillMaxWidth()
             .height(dynamicHeight),
-        color = Color(0xFFF8F9FA),
+        color = MaterialTheme.colorScheme.surface, // 🌟 ĐỘNG: Gạt bỏ nền xám trắng cứng cũ, tự thích ứng màu nền khối sáng/tối
         shadowElevation = (morphProgress * 4).dp
     ) {
         Box(
@@ -63,12 +64,17 @@ fun MorphingChartSection(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.graphicsLayer { alpha = 1f - morphProgress * 1.66f }
                 ) {
-                    Text("Tổng cộng", fontSize = 11.sp, color = Color.Gray)
+                    Text(
+                        text = "Tổng cộng",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant // 🌟 ĐỘNG: Nhãn text phụ phân cấp rõ nét
+                    )
                     val total = remember(chartData) { chartData.sumOf { it.totalAmount } }
                     Text(
                         text = "${String.format("%,.0f", total)} đ",
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Black
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface // 🌟 ĐỘNG: Số tiền hiển thị tương phản sắc sảo (Trắng/Đen)
                     )
                 }
             }
@@ -85,6 +91,9 @@ private fun MorphingCanvas(
     optimizedData: List<Pair<ChartData, Color>>,
     progress: Float
 ) {
+    // 🌟 ĐỘNG: Lấy dải màu outline của hệ thống để vẽ vòng tròn nền hướng dẫn thị giác trong Canvas
+    val guideCircleColor = MaterialTheme.colorScheme.outlineVariant
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
@@ -99,7 +108,7 @@ private fun MorphingCanvas(
         // Vẽ vòng tròn nền mờ hỗ trợ thị giác
         if (progress < 1f) {
             drawCircle(
-                color = Color.LightGray.copy(alpha = (1f - progress) * 0.15f),
+                color = guideCircleColor.copy(alpha = (1f - progress) * 0.25f), // 🌟 ĐỘNG: Đồng bộ độ mờ tinh tế theo cấu trúc nền tối/sáng
                 radius = basePieRadius,
                 center = pieCenter,
                 style = Stroke(width = pieStrokeWidth)
@@ -122,7 +131,6 @@ private fun MorphingCanvas(
             val barSize = Size(sectionBarWidth, barHeight)
 
             // 3. THUẬT TOÁN MORPHING NỘI SUY (INTERPOLATION)
-            // Biến đổi mượt mà vùng bao kích thước (Rect) và tọa độ từ Cung tròn thành Thanh ngang
             val morphTopLeft = Offset(
                 x = lerp(pieTopLeft.x, barTopLeft.x, progress),
                 y = lerp(pieTopLeft.y, barTopLeft.y, progress)
@@ -137,7 +145,7 @@ private fun MorphingCanvas(
                 // CHẾ ĐỘ BIẾN HÌNH CHỦ ĐẠO: Cung tròn bẹt và kéo dãn tọa độ ra biên màn hình
                 drawArc(
                     color = color,
-                    startAngle = lerp(currentStartAngle, 0f, progress), // Ép góc xoay về 0 độ nằm ngang
+                    startAngle = lerp(currentStartAngle, 0f, progress),
                     sweepAngle = lerp(sweepAngle, 360f * (data.percentage / 100f), progress),
                     useCenter = false,
                     topLeft = morphTopLeft,
@@ -150,10 +158,10 @@ private fun MorphingCanvas(
                 val isLast = index == optimizedData.lastIndex
 
                 val cornerRadius = when {
-                    isFirst && isLast -> CornerRadius(6.dp.toPx(), 6.dp.toPx()) // Chỉ có 1 danh mục duy nhất
-                    isFirst -> CornerRadius(6.dp.toPx(), 0f) // Chỉ bo góc trái ngoài cùng
-                    isLast -> CornerRadius(0f, 6.dp.toPx())  // Chỉ bo góc phải ngoài cùng
-                    else -> CornerRadius.Zero // Các đoạn ở giữa vuông thành sắc cạnh kết nối khít nhau
+                    isFirst && isLast -> CornerRadius(6.dp.toPx(), 6.dp.toPx())
+                    isFirst -> CornerRadius(6.dp.toPx(), 0f)
+                    isLast -> CornerRadius(0f, 6.dp.toPx())
+                    else -> CornerRadius.Zero
                 }
 
                 drawRoundRect(
@@ -164,14 +172,12 @@ private fun MorphingCanvas(
                 )
             }
 
-            // Tăng tiến luỹ kế tuyến tính
             currentStartAngle += sweepAngle
             currentBarX += sectionBarWidth
         }
     }
 }
 
-// Hàm bổ trợ tính toán nội suy tuyến tính (Linear Interpolation)
 private fun lerp(start: Float, stop: Float, fraction: Float): Float {
     return start + fraction * (stop - start)
 }

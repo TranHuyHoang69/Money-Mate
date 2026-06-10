@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.R
+import com.example.moneymate.StringRes
 import com.example.moneymate.ui.navigation.Screen
+import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
 import com.example.moneymate.viewmodel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -71,7 +73,6 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Đã chuyển State email và password xuống các Composable thành phần để cô lập Recomposition
     var emailState by remember { mutableStateOf("") }
     var passwordState by remember { mutableStateOf("") }
 
@@ -100,7 +101,6 @@ fun LoginScreen(
         }
     }
 
-    // Logic điều hướng: Giữ nguyên cơ chế bảo mật xóa lịch sử
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) {
             navController.navigate(Screen.MainScreen.route) {
@@ -110,13 +110,15 @@ fun LoginScreen(
         }
     }
 
-    // --- GIAO DIỆN TĨNH VỚI GRADIENT (Ổn định 100%, không bị vẽ lại khi gõ chữ) ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF4B8361), Color(0xFF2D503B))
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.primaryContainer
+                    )
                 )
             )
     ) {
@@ -124,15 +126,24 @@ fun LoginScreen(
 
             // Header Section
             Spacer(modifier = Modifier.weight(0.3f))
-            Text(text = "MoneyMate", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text(text = "Quản lý thông minh - Tương lai vững chắc", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
+            Text(
+                text = stringResource(StringRes.app_name), // ✅ Sửa lỗi compile nhãn id =
+                fontSize = 42.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onPrimary // ✅ Đồng bộ màu chữ trên nền Primary thích ứng
+            )
+            Text(
+                text = stringResource(StringRes.login_slogan), // ✅ Sửa lỗi compile nhãn id =
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) // ✅ Đồng bộ màu chữ thích ứng hệ thống
+            )
             Spacer(modifier = Modifier.weight(0.1f))
 
-            // Form Content bên trong Surface
+            // Form Content bọc bên trong Surface
             Surface(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 Column(
@@ -142,10 +153,15 @@ fun LoginScreen(
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Chào mừng quay trở lại!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2D503B))
+                    Text(
+                        text = stringResource(StringRes.login_welcome_title), // ✅ Sửa lỗi compile nhãn id =
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 1. Ô nhập Email được cô lập hoàn toàn
+                    // 1. Ô nhập Email cô lập Recomposition
                     EmailInputField(
                         value = emailState,
                         onValueChange = { emailState = it }
@@ -153,13 +169,12 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. Ô nhập Mật khẩu được cô lập hoàn toàn
+                    // 2. Ô nhập Mật khẩu cô lập Recomposition
                     PasswordInputField(
                         value = passwordState,
                         onValueChange = { passwordState = it }
                     )
 
-                    // Hiển thị thông báo lỗi (Chỉ vẽ lại khi luồng State Auth lỗi thực sự thay đổi)
                     if (uiState.error.isNotEmpty()) {
                         Text(
                             text = uiState.error,
@@ -171,7 +186,7 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 3. Nút Đăng nhập tối ưu hóa Recompose
+                    // 3. Nút Đăng nhập hệ thống
                     Button(
                         onClick = {
                             focusManager.clearFocus()
@@ -180,23 +195,26 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = !uiState.isLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4B8361))
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
                         if (uiState.isLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                         } else {
-                            Text("ĐĂNG NHẬP", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(text = stringResource(StringRes.login_btn), fontWeight = FontWeight.Bold, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Điều hướng sang đăng ký
+                    // Điều hướng sang màn hình đăng ký
                     Row {
-                        Text("Chưa có tài khoản? ", color = Color.Gray)
+                        Text(text = stringResource(StringRes.no_account), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
                         Text(
-                            text = "Đăng ký",
-                            color = Color(0xFF4B8361),
+                            text = stringResource(StringRes.register_btn), // ✅ Sửa lỗi compile nhãn id =
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable { navController.navigate("register") }
                         )
@@ -204,13 +222,13 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
-                        Text("Hoặc", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 12.sp)
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Text(text = stringResource(StringRes.or_separator), modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) // ✅ Sửa lỗi compile nhãn id =
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // 4. Nút đăng nhập Google
+                    // 4. Nút đăng nhập Google thích ứng
                     GoogleSignInButton(
                         onClick = {
                             focusManager.clearFocus()
@@ -230,15 +248,13 @@ fun LoginScreen(
     }
 }
 
-// --- CÁC THÀNH PHẦN ĐƯỢC TÁCH BIỆT ĐỂ KHỬ TRÙNG SKIP FRAME ---
-
 @Composable
 fun EmailInputField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("Email") },
-        placeholder = { Text("example@gmail.com") },
+        label = { Text(text = stringResource(StringRes.email_label)) }, // ✅ Sửa lỗi compile nhãn id =
+        placeholder = { Text(text = stringResource(StringRes.email_hint)) }, // ✅ Sửa lỗi compile nhãn id =
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         singleLine = true,
@@ -252,13 +268,13 @@ fun PasswordInputField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("Mật khẩu") },
+        label = { Text(text = stringResource(StringRes.password_label)) }, // ✅ Sửa lỗi compile nhãn id =
         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                 Icon(
                     imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = null
+                    contentDescription = stringResource(StringRes.toggle_password_visibility_desc) // ✅ Sửa lỗi compile nhãn id =
                 )
             }
         },
@@ -278,8 +294,8 @@ fun GoogleSignInButton(
     Surface(
         onClick = { if (!isLoading) onClick() },
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color.LightGray),
-        color = if (isLoading) Color.LightGray.copy(alpha = 0.5f) else Color.White,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+        color = if (isLoading) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier.fillMaxWidth().height(50.dp)
     ) {
         Row(
@@ -288,16 +304,20 @@ fun GoogleSignInButton(
             modifier = Modifier.padding(horizontal = 12.dp)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
             } else {
                 Icon(
                     painter = painterResource(R.drawable.ic_google),
-                    contentDescription = "Google logo",
+                    contentDescription = stringResource(StringRes.login_with_google), // ✅ Sửa lỗi compile nhãn id =
                     modifier = Modifier.size(24.dp),
                     tint = Color.Unspecified
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(text = "Tiếp tục với Google", fontSize = 16.sp)
+                Text(
+                    text = stringResource(StringRes.continue_with_google_btn), // ✅ Sửa lỗi compile nhãn id =
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
