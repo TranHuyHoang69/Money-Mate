@@ -34,10 +34,12 @@ import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.domain.model.UserPreferences
 import com.example.moneymate.ui.component.AppDrawer
+import com.example.moneymate.ui.navigation.ReceiptScanNavKeys
 import com.example.moneymate.ui.screen.AddCategoryScreen
 import com.example.moneymate.ui.screen.AddReminderScreen
 import com.example.moneymate.ui.screen.AddScreen
 import com.example.moneymate.ui.screen.AuthLockScreen
+import com.example.moneymate.ui.screen.BudgetScreen
 import com.example.moneymate.ui.screen.CategoryManagementScreen
 import com.example.moneymate.ui.screen.ChangePinScreen
 import com.example.moneymate.ui.screen.CreatePinScreen
@@ -49,9 +51,13 @@ import com.example.moneymate.ui.screen.GroupedExpenseScreen
 import com.example.moneymate.ui.screen.HomeScreen
 import com.example.moneymate.ui.screen.LoginScreen
 import com.example.moneymate.ui.screen.ProfileScreen
+import com.example.moneymate.ui.screen.ReceiptScanScreen
 import com.example.moneymate.ui.screen.RegisterScreen
 import com.example.moneymate.ui.screen.ReminderListScreen
+import com.example.moneymate.ui.screen.RecurringTransactionEditorScreen
+import com.example.moneymate.ui.screen.RecurringTransactionScreen
 import com.example.moneymate.ui.screen.SecurityScreen
+import com.example.moneymate.ui.screen.StatisticsScreen
 import com.example.moneymate.ui.screen.UpdateReminderScreen
 import com.example.moneymate.ui.screen.UpdateScreen
 import com.example.moneymate.ui.theme.LocalLanguage
@@ -66,6 +72,7 @@ import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.HomeViewModel
 import com.example.moneymate.viewmodel.ReminderViewModel
 import com.example.moneymate.viewmodel.SecurityViewModel
+import com.example.moneymate.viewmodel.StatisticsViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -108,6 +115,7 @@ fun AppNavigation() {
         allCategoriesEntity.map { entity ->
             Category(
                 id = entity.categoryId,
+                stableId = entity.stableId,
                 title = entity.title,
                 iconResName = entity.iconResName,
                 colorHex = entity.colorHex,
@@ -293,10 +301,33 @@ fun AppNavigation() {
                             if (authUiState.isLoggedIn) AddScreen(navController = navController) else LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
                         }
 
+                        composable(Screen.ReceiptScan.route) {
+                            if (authUiState.isLoggedIn) {
+                                ReceiptScanScreen(
+                                    onBackClick = { navController.popBackStack() },
+                                    onUseResult = { result ->
+                                        navController.previousBackStackEntry?.savedStateHandle?.apply {
+                                            result.amount?.let {
+                                                set(ReceiptScanNavKeys.AMOUNT, it.toAmountInputString())
+                                            }
+                                            result.dateMillis?.let {
+                                                set(ReceiptScanNavKeys.DATE_MILLIS, it)
+                                            }
+                                            set(ReceiptScanNavKeys.NOTE, result.note)
+                                            set(ReceiptScanNavKeys.CATEGORY_TITLE, result.suggestedCategoryTitle)
+                                        }
+                                        navController.popBackStack()
+                                    }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
+
                         // --- DETAIL LIST MẶC ĐỊNH ---
                         composable(Screen.History.route) {
                             val historyViewModel: HistoryViewModel = safeHiltViewModel(safeViewModelOwner)
-                            DetailListScreen(navController = navController, historyViewModel = historyViewModel, categoryId = 0L, categoryName = "Lịch sử", type = "CHI PHÍ", onOpenDrawer = { scope.launch { drawerState.open() } })
+                            DetailListScreen(navController = navController, historyViewModel = historyViewModel, categoryId = 0L, categoryName = "Lịch sử", type = TransactionType.SPEND.name, onOpenDrawer = { scope.launch { drawerState.open() } })
                         }
 
                         // --- XEM CỤM GIAO DỊCH THEO DANH MỤC ---
@@ -388,6 +419,69 @@ fun AppNavigation() {
                             val reminderViewModel: ReminderViewModel = safeHiltViewModel(safeViewModelOwner)
                             UpdateReminderScreen(reminderId = reminderId, viewModel = reminderViewModel, onBackClick = { navController.popBackStack() })
                         }
+
+                        composable(Screen.Statistics.route) {
+                            if (authUiState.isLoggedIn) {
+                                val statisticsViewModel: StatisticsViewModel = safeHiltViewModel(safeViewModelOwner)
+                                StatisticsScreen(
+                                    navController = navController,
+                                    viewModel = statisticsViewModel,
+                                    onOpenDrawer = { scope.launch { drawerState.open() } }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
+
+                        composable(Screen.Budget.route) {
+                            if (authUiState.isLoggedIn) {
+                                BudgetScreen(
+                                    onOpenDrawer = { scope.launch { drawerState.open() } }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
+
+                        composable(Screen.RecurringTransactions.route) {
+                            if (authUiState.isLoggedIn) {
+                                RecurringTransactionScreen(
+                                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                                    onAddClick = { navController.navigate(Screen.RecurringTransactionAdd.route) },
+                                    onEditClick = { transactionKey ->
+                                        navController.navigate("recurring_transaction_edit/$transactionKey")
+                                    }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
+
+                        composable(Screen.RecurringTransactionAdd.route) {
+                            if (authUiState.isLoggedIn) {
+                                RecurringTransactionEditorScreen(
+                                    transactionKey = null,
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
+
+                        composable(
+                            Screen.RecurringTransactionEdit.route,
+                            arguments = listOf(navArgument("transactionKey") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            if (authUiState.isLoggedIn) {
+                                val transactionKey = backStackEntry.arguments?.getString("transactionKey")
+                                RecurringTransactionEditorScreen(
+                                    transactionKey = transactionKey,
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            } else {
+                                LaunchedEffect(Unit) { navController.navigate(Screen.Login.route) }
+                            }
+                        }
                     }
                 }
             }
@@ -408,6 +502,14 @@ fun Context.findActivity(): ComponentActivity? {
 }
 
 // ✅ ĐÃ SỬA: Hàm bổ trợ xử lý null an toàn cho LocalViewModelStoreOwner.current bằng toán tử Elvis fallback
+private fun Double.toAmountInputString(): String {
+    return if (this % 1.0 == 0.0) {
+        toLong().toString()
+    } else {
+        toString()
+    }
+}
+
 @Composable
 inline fun <reified VM : androidx.lifecycle.ViewModel> safeHiltViewModel(fallbackOwner: ViewModelStoreOwner): VM {
     val context = LocalContext.current

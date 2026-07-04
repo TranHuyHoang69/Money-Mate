@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,10 +28,11 @@ fun ExpenseItem(
     percent: String,
     amount: String,
     color: Color,
-    modifier: Modifier = Modifier // <-- THÊM DÒNG NÀY
+    syncStatusLabel: String? = null,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier // <-- GÁN MODIFIER VÀO ĐÂY
+        modifier = modifier
             .fillMaxWidth()
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -46,14 +48,22 @@ fun ExpenseItem(
         }
 
         Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
+            Text(title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(percent, fontSize = 12.sp, color = Color.Gray)
+            if (!syncStatusLabel.isNullOrBlank()) {
+                Text(
+                    syncStatusLabel,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         Text(
             amount,
             fontWeight = FontWeight.ExtraBold,
-            color = if (amount.contains("-")) Color.Red else Color(0xFF333333)
+            color = if (amount.contains("-")) Color.Red else MaterialTheme.colorScheme.onSurface
         )
     }
 }

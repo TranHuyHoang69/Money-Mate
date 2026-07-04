@@ -46,24 +46,14 @@ object AlarmScheduler {
 
         var triggerTime = reminder.reminderDateTime
         val now = System.currentTimeMillis()
+        val repeat = ReminderRepeat.fromStored(reminder.repeatInterval)
 
         // 🔥 XỬ LÝ THỜI GIAN QUÁ KHỨ: Tịnh tiến đến chu kỳ kế tiếp trong tương lai
-        if (triggerTime <= now && reminder.repeatInterval != "Một lần") {
+        if (triggerTime <= now && repeat != ReminderRepeat.ONCE) {
             val calendar = Calendar.getInstance().apply { timeInMillis = triggerTime }
 
             while (calendar.timeInMillis <= now) {
-                when (reminder.repeatInterval) {
-                    "Hàng ngày" -> calendar.add(Calendar.DAY_OF_YEAR, 1)
-                    "Hàng tuần" -> calendar.add(Calendar.WEEK_OF_YEAR, 1)
-                    "Mỗi 2 tuần" -> calendar.add(Calendar.WEEK_OF_YEAR, 2)
-                    "Mỗi 4 tuần" -> calendar.add(Calendar.WEEK_OF_YEAR, 4)
-                    "Hàng tháng" -> calendar.add(Calendar.MONTH, 1)
-                    "Mỗi 2 tháng" -> calendar.add(Calendar.MONTH, 2)
-                    "Hàng quý" -> calendar.add(Calendar.MONTH, 3)
-                    "Mỗi 6 tháng" -> calendar.add(Calendar.MONTH, 6)
-                    "Mỗi năm" -> calendar.add(Calendar.YEAR, 1)
-                    else -> break
-                }
+                if (!repeat.addTo(calendar)) break
             }
             triggerTime = calendar.timeInMillis
             Log.d("AlarmScheduler", "Đã điều chỉnh mốc thời gian quá khứ của [${reminder.title}] sang tương lai: ${Date(triggerTime)}")

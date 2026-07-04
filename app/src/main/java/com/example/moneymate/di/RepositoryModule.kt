@@ -1,10 +1,14 @@
 package com.example.moneymate.di
 
 import com.example.moneymate.data.repository.AuthRepositoryImpl
+import com.example.moneymate.data.repository.BudgetRepositoryImpl
 import com.example.moneymate.data.repository.ExpenseRepositoryImpl
+import com.example.moneymate.data.repository.RecurringTransactionRepositoryImpl
 import com.example.moneymate.data.repository.ReminderRepositoryImpl
 import com.example.moneymate.domain.repository.AuthRepository
+import com.example.moneymate.domain.repository.BudgetRepository
 import com.example.moneymate.domain.repository.ExpenseRepository
+import com.example.moneymate.domain.repository.RecurringTransactionRepository
 import com.example.moneymate.domain.repository.ReminderRepository
 import dagger.Binds
 import dagger.Module
@@ -33,4 +37,16 @@ abstract class RepositoryModule {
     abstract fun bindReminderRepository(
        impl : ReminderRepositoryImpl
     ): ReminderRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBudgetRepository(
+        impl: BudgetRepositoryImpl
+    ): BudgetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecurringTransactionRepository(
+        impl: RecurringTransactionRepositoryImpl
+    ): RecurringTransactionRepository
 }

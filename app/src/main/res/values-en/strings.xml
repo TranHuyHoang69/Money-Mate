@@ -208,6 +208,7 @@
     <string name="set_reminder_time">Set Reminder Time</string>
     <string name="save_reminder">Save Reminder</string>
     <plurals name="reminder_selected_count">
+        <item quantity="one">%d selected</item>
         <item quantity="other">%d selected</item>
     </plurals>
     <string name="reminder_delete_selected_desc">Delete all selected items</string>
@@ -301,6 +302,29 @@
     <string name="currency_format">₫%,.0f</string>
     <string name="date_format">MM/dd/yyyy</string>
     <string name="time_format">hh:mm a</string>
+
+    <!-- app/src/main/res/values-en/strings.xml -->
+    <!-- Thêm vào cuối file, trước </resources> -->
+
+    <!-- Statistics Screen -->
+    <string name="nav_statistics">Statistics</string>
+    <string name="statistics_overview">Overview</string>
+    <string name="statistics_expense">Expense</string>
+    <string name="statistics_income">Income</string>
+    <string name="statistics_day">Day</string>
+    <string name="statistics_week">Week</string>
+    <string name="statistics_month">Month</string>
+    <string name="statistics_year">Year</string>
+    <string name="statistics_total_income">Total Income</string>
+    <string name="statistics_total_expense">Total Expense</string>
+    <string name="statistics_profit">Profit</string>
+    <string name="statistics_loss">Loss</string>
+    <string name="statistics_category_detail">Details by Category</string>
+    <string name="statistics_transactions_count">%d transactions</string>
+    <string name="statistics_no_data">No data in this period</string>
+    <string name="statistics_no_expense">No expenses in this period</string>
+    <string name="statistics_no_income">No income in this period</string>
+    <string name="statistics_error_loading">Error loading data</string>
 
     <!--Others -->
     <string name="lang_vi">Vietnamese</string>

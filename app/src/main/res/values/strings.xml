@@ -291,6 +291,29 @@
     <string name="sort_amount_desc_with_desc">Số tiền (Giảm dần)</string>
     <string name="date_picker_range_title">Chọn khoảng thời gian</string>
 
+    <!-- app/src/main/res/values/strings.xml -->
+    <!-- Thêm vào cuối file, trước </resources> -->
+
+    <!-- Statistics Screen -->
+    <string name="nav_statistics">Thống kê</string>
+    <string name="statistics_overview">Chung</string>
+    <string name="statistics_expense">Chi phí</string>
+    <string name="statistics_income">Thu nhập</string>
+    <string name="statistics_day">Ngày</string>
+    <string name="statistics_week">Tuần</string>
+    <string name="statistics_month">Tháng</string>
+    <string name="statistics_year">Năm</string>
+    <string name="statistics_total_income">Tổng thu nhập</string>
+    <string name="statistics_total_expense">Tổng chi phí</string>
+    <string name="statistics_profit">Lợi nhuận</string>
+    <string name="statistics_loss">Lỗ</string>
+    <string name="statistics_category_detail">Chi tiết theo danh mục</string>
+    <string name="statistics_transactions_count">%d giao dịch</string>
+    <string name="statistics_no_data">Không có dữ liệu trong khoảng thời gian này</string>
+    <string name="statistics_no_expense">Không có chi phí trong khoảng thời gian này</string>
+    <string name="statistics_no_income">Không có thu nhập trong khoảng thời gian này</string>
+    <string name="statistics_error_loading">Lỗi tải dữ liệu</string>
+
     <!--Others -->
     <string name="lang_vi">Tiếng Việt</string>
     <string name="lang_en">English</string>

@@ -1,5 +1,6 @@
 package com.example.moneymate.ui.screen
 
+import android.widget.Toast
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,13 +44,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.moneymate.StringRes
 import com.example.moneymate.ui.navigation.Screen
 import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
+import com.example.moneymate.util.BiometricAuthHelper
 import com.example.moneymate.viewmodel.SecurityViewModel
-import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -204,21 +205,54 @@ fun SecurityScreen(navController: NavController, viewModel: SecurityViewModel, o
                             ),
                             onCheckedChange = { checked ->
                                 if (checked) {
-                                    val executor = Executors.newSingleThreadExecutor()
-                                    val prompt = BiometricPrompt(
-                                        context as FragmentActivity,
-                                        executor,
-                                        object : BiometricPrompt.AuthenticationCallback() {
-                                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                                viewModel.toggleBiometric(true)
-                                            }
-                                        })
-                                    val info = BiometricPrompt.PromptInfo.Builder()
-                                        .setTitle(bioPromptTitle)
-                                        .setSubtitle(bioPromptSubtitle)
-                                        .setNegativeButtonText(bioPromptCancel)
-                                        .build()
-                                    prompt.authenticate(info)
+                                    val biometricStatus = BiometricAuthHelper.canAuthenticate(context)
+                                    if (!BiometricAuthHelper.isAvailable(biometricStatus)) {
+                                        Toast.makeText(
+                                            context,
+                                            BiometricAuthHelper.statusMessage(biometricStatus),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        val activity = BiometricAuthHelper.findFragmentActivity(context)
+                                        if (activity == null) {
+                                            Toast.makeText(
+                                                context,
+                                                "Khong the mo xac thuc sinh trac hoc. Vui long dung PIN.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            val prompt = BiometricPrompt(
+                                                activity,
+                                                ContextCompat.getMainExecutor(context),
+                                                object : BiometricPrompt.AuthenticationCallback() {
+                                                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                                        viewModel.toggleBiometric(true)
+                                                    }
+
+                                                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                                        if (!BiometricAuthHelper.isUserCancelError(errorCode)) {
+                                                            Toast.makeText(context, errString, Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+
+                                                    override fun onAuthenticationFailed() {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Khong nhan dien duoc sinh trac hoc. Vui long thu lai hoac dung PIN.",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+                                            )
+                                            val info = BiometricPrompt.PromptInfo.Builder()
+                                                .setTitle(bioPromptTitle)
+                                                .setSubtitle(bioPromptSubtitle)
+                                                .setAllowedAuthenticators(BiometricAuthHelper.AUTHENTICATORS)
+                                                .setNegativeButtonText(bioPromptCancel)
+                                                .build()
+                                            prompt.authenticate(info)
+                                        }
+                                    }
                                 } else {
                                     viewModel.toggleBiometric(false)
                                 }

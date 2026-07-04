@@ -4,6 +4,7 @@ import com.google.firebase.firestore.PropertyName
 
 data class FireStoreCategory(
     var categoryId: Long = 0,
+    var stableId: String = "",
     var userId: String = "",
     var title: String = "",
     var iconResName: String = "",

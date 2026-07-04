@@ -1,5 +1,6 @@
 package com.example.moneymate.ui.screen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,9 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
@@ -53,9 +54,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.StringRes
+import com.example.moneymate.domain.model.ExpenseSyncStatus
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.item.ExpenseItem
-import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.CalendarMode
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.SortType
@@ -76,47 +78,41 @@ fun DetailListScreen(
     historyViewModel: HistoryViewModel = hiltViewModel(),
     categoryId: Long = 0L,
     categoryName: String = "",
-    type: String = "CHI PHÍ",
+    type: String = TransactionType.SPEND.name,
     onOpenDrawer: () -> Unit
 ) {
     val expensesByPeriod by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
 
-    // Key cấu hình mặc định dịch từ file strings
-    val defaultTitle = stringResource(StringRes.history_transaction_default_title) // ✅ Sửa lỗi compile nhãn id =
+    val defaultTitle = stringResource(StringRes.history_transaction_default_title)
     val displayTitle = remember(categoryName, defaultTitle) {
         categoryName.ifEmpty { defaultTitle }
     }
 
-    val typeSpendKey = stringResource(StringRes.type_spend_upper) // ✅ Sửa lỗi compile nhãn id =
-    val typeIncomeKey = stringResource(StringRes.type_income_upper) // ✅ Sửa lỗi compile nhãn id =
-
-    var selectedType by remember(type, typeSpendKey, typeIncomeKey) {
-        mutableStateOf(if (type.contains("THU", ignoreCase = true)) typeIncomeKey else typeSpendKey)
+    val typeSpendLabel = stringResource(StringRes.type_spend_upper)
+    val typeIncomeLabel = stringResource(StringRes.type_income_upper)
+    var selectedType by remember(type) {
+        mutableStateOf(parseTransactionTypeRoute(type))
     }
 
-    val sortTimeLabel = stringResource(StringRes.sort_by_time) // ✅ Sửa lỗi compile nhãn id =
-    val sortAmountLabel = stringResource(StringRes.sort_by_amount) // ✅ Sửa lỗi compile nhãn id =
-    var currentSortType by remember(sortTimeLabel) { mutableStateOf(sortTimeLabel) }
-
+    val sortTimeLabel = stringResource(StringRes.sort_by_time)
+    val sortAmountLabel = stringResource(StringRes.sort_by_amount)
+    var currentSortType by remember { mutableStateOf(SortType.TIME_DESC) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val dateRangePickerState = rememberDateRangePickerState(
         initialSelectedStartDateMillis = System.currentTimeMillis()
     )
 
-    // Đồng bộ dải màu theo chuẩn token Material 3 thích ứng động thay vì nạp cứng mã màu HEX
     val spendColor = MaterialTheme.colorScheme.primary
     val incomeColor = MaterialTheme.colorScheme.tertiary
-    val themeColor = remember(selectedType, typeSpendKey, spendColor, incomeColor) {
-        if (selectedType == typeSpendKey) spendColor else incomeColor
+    val themeColor = remember(selectedType, spendColor, incomeColor) {
+        if (selectedType == TransactionType.SPEND) spendColor else incomeColor
     }
 
-    // Tối ưu: Lọc danh sách kết hợp map chuỗi thời gian được tính toán trước
-    val filteredList = remember(expensesByPeriod, selectedType, typeSpendKey, categoryId) {
+    val filteredList = remember(expensesByPeriod, selectedType, categoryId) {
         expensesByPeriod.filter { expense ->
-            val targetType = if (selectedType == typeSpendKey) TransactionType.SPEND else TransactionType.INCOME
-            val matchesType = expense.type == targetType
+            val matchesType = expense.type == selectedType
             val matchesCategory = if (categoryId == 0L) true else expense.category.id == categoryId
             matchesType && matchesCategory
         }.map { expense ->
@@ -128,7 +124,7 @@ fun DetailListScreen(
         filteredList.sumOf { it.first.amount }
     }
 
-    val currencyUnit = stringResource(StringRes.currency_unit) // ✅ Sửa lỗi compile nhãn id =
+    val currencyUnit = stringResource(StringRes.currency_unit)
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -142,12 +138,12 @@ fun DetailListScreen(
                     }
                     showDatePicker = false
                 }) {
-                    Text(text = stringResource(StringRes.confirm_btn), color = themeColor, fontWeight = FontWeight.Bold) // ✅ Sửa lỗi compile nhãn id =
+                    Text(text = stringResource(StringRes.confirm_btn), color = themeColor, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
+                    Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         ) {
@@ -155,10 +151,15 @@ fun DetailListScreen(
                 DateRangePicker(
                     state = dateRangePickerState,
                     modifier = Modifier.weight(1f),
-                    title = { Text(text = stringResource(StringRes.date_picker_range_title), modifier = Modifier.padding(16.dp)) }, // ✅ Sửa lỗi compile nhãn id =
+                    title = {
+                        Text(
+                            text = stringResource(StringRes.date_picker_range_title),
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    },
                     headline = {
                         Text(
-                            text = stringResource(StringRes.date_picker_range_headline), // ✅ Sửa lỗi compile nhãn id =
+                            text = stringResource(StringRes.date_picker_range_headline),
                             modifier = Modifier.padding(horizontal = 16.dp),
                             fontSize = 14.sp
                         )
@@ -176,7 +177,7 @@ fun DetailListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = MaterialTheme.colorScheme.primaryContainer, // ✅ Chuyển sang màu hệ thống động thay vì nạp cứng mã HEX xanh cổ vịt
+                        color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     )
                     .padding(horizontal = 16.dp, vertical = 20.dp)
@@ -189,15 +190,15 @@ fun DetailListScreen(
                     IconButton(onClick = onOpenDrawer) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = stringResource(StringRes.menu_icon_desc), // ✅ Sửa lỗi compile nhãn id =
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer, // ✅ Cập nhật màu Icon thích ứng với thanh tiêu đề mới
+                            contentDescription = stringResource(StringRes.menu_icon_desc),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = displayTitle,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer, // ✅ Cập nhật màu Text thích ứng với thanh tiêu đề mới
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -210,7 +211,6 @@ fun DetailListScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // Tabs Thu/Chi
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface
@@ -226,19 +226,22 @@ fun DetailListScreen(
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    listOf(typeSpendKey, typeIncomeKey).forEach { title ->
-                        val isSelected = selectedType == title
+                    listOf(
+                        TransactionType.SPEND to typeSpendLabel,
+                        TransactionType.INCOME to typeIncomeLabel
+                    ).forEach { (transactionType, label) ->
+                        val isSelected = selectedType == transactionType
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (isSelected) themeColor else Color.Transparent)
-                                .clickable { selectedType = title }
+                                .clickable { selectedType = transactionType }
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = title,
+                                text = label,
                                 color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.ExtraBold
@@ -248,7 +251,6 @@ fun DetailListScreen(
                 }
             }
 
-            // Navigation Thời gian
             CompactTimeNavigation(
                 currentMode = historyViewModel.calendarMode,
                 displayTime = historyViewModel.getDisplayTime(),
@@ -260,28 +262,26 @@ fun DetailListScreen(
                 onRangeClick = { showDatePicker = true }
             )
 
-            // Tổng cộng & Sắp xếp
             SummaryRow(
                 totalAmount = totalAmount,
                 themeColor = themeColor,
-                currentSortType = currentSortType,
+                currentSortType = if (currentSortType == SortType.TIME_DESC) sortTimeLabel else sortAmountLabel,
                 sortTimeLabel = sortTimeLabel,
                 sortAmountLabel = sortAmountLabel,
                 currencyUnit = currencyUnit,
-                onSortChange = { label, isTime ->
-                    currentSortType = label
-                    historyViewModel.updateSortType(if (isTime) SortType.TIME_DESC else SortType.AMOUNT_DESC)
+                onSortChange = { _, isTime ->
+                    currentSortType = if (isTime) SortType.TIME_DESC else SortType.AMOUNT_DESC
+                    historyViewModel.updateSortType(currentSortType)
                 }
             )
 
-            // Danh sách hiển thị lịch sử giao dịch
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
                     CircularProgressIndicator(color = themeColor)
                 }
             } else if (filteredList.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text(text = stringResource(StringRes.no_data_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
+                    Text(text = stringResource(StringRes.no_data_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(
@@ -292,16 +292,22 @@ fun DetailListScreen(
                         items = filteredList,
                         key = { index, pair -> "${pair.first.id}_$index" },
                         contentType = { _, _ -> "ExpenseItem" }
-                    ) { index, (expense, formattedTime) ->
+                    ) { _, (expense, formattedTime) ->
                         ExpenseItem(
                             title = expense.category.title,
                             percent = formattedTime,
                             amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${currencyFormatter.format(expense.amount)} $currencyUnit",
                             color = expense.category.colorHex.toComposeColor(),
+                            syncStatusLabel = expense.syncStatusLabel(),
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .clickable {
-                                    navController.navigate("detail_expense/${expense.id}")
+                                    val docId = expense.firestoreDocId
+                                    if (docId.isNotEmpty()) {
+                                        navController.navigate("detail_expense/$docId")
+                                    } else {
+                                        android.util.Log.e("DetailListScreen", "Missing firestoreDocId")
+                                    }
                                 }
                         )
                     }
@@ -329,12 +335,11 @@ fun CompactTimeNavigation(
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            // ✅ i18n: Ánh xạ danh mục lịch thời gian động
             val modes = listOf(
-                CalendarMode.DAY to stringResource(StringRes.day), // ✅ Sửa lỗi compile nhãn id =
-                CalendarMode.WEEK to stringResource(StringRes.week), // ✅ Sửa lỗi compile nhãn id =
-                CalendarMode.MONTH to stringResource(StringRes.month), // ✅ Sửa lỗi compile nhãn id =
-                CalendarMode.YEAR to stringResource(StringRes.year) // ✅ Sửa lỗi compile nhãn id =
+                CalendarMode.DAY to stringResource(StringRes.day),
+                CalendarMode.WEEK to stringResource(StringRes.week),
+                CalendarMode.MONTH to stringResource(StringRes.month),
+                CalendarMode.YEAR to stringResource(StringRes.year)
             )
             modes.forEach { (mode, label) ->
                 val isSelected = currentMode == mode
@@ -350,7 +355,7 @@ fun CompactTimeNavigation(
                 )
             }
             Text(
-                text = stringResource(StringRes.period_custom_range), // ✅ Sửa lỗi compile nhãn id =
+                text = stringResource(StringRes.period_custom_range),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onRangeClick() }
@@ -369,7 +374,7 @@ fun CompactTimeNavigation(
             val isCustom = currentMode == CalendarMode.CUSTOM
             IconButton(onClick = onPrevious, enabled = !isCustom) {
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowLeft,
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     contentDescription = null,
                     tint = if (isCustom) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f) else themeColor
                 )
@@ -384,7 +389,7 @@ fun CompactTimeNavigation(
             val nextState = isNextEnabled && !isCustom
             IconButton(onClick = onNext, enabled = nextState) {
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowRight,
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = if (nextState) themeColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 )
@@ -413,7 +418,7 @@ fun SummaryRow(
     ) {
         Column {
             Text(
-                text = stringResource(StringRes.total_summary_label), // ✅ Sửa lỗi compile nhãn id =
+                text = stringResource(StringRes.total_summary_label),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -429,14 +434,14 @@ fun SummaryRow(
                 modifier = Modifier.clickable { expanded = true },
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${stringResource(StringRes.sort_prefix)} $currentSortType", // ✅ Sửa lỗi compile nhãn id =
+                        text = "${stringResource(StringRes.sort_prefix)} $currentSortType",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -479,5 +484,17 @@ fun String.toComposeColor(): Color {
         }
     } catch (e: Exception) {
         Color.Gray
+    }
+}
+
+internal fun parseTransactionTypeRoute(value: String): TransactionType {
+    return runCatching { TransactionType.valueOf(value) }.getOrDefault(TransactionType.SPEND)
+}
+
+private fun com.example.moneymate.domain.model.Expense.syncStatusLabel(): String? {
+    return when {
+        lastSyncError != null -> "Đồng bộ lỗi"
+        syncStatus != ExpenseSyncStatus.SYNCED -> "Chờ đồng bộ"
+        else -> null
     }
 }

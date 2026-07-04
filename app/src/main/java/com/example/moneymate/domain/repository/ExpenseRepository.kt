@@ -11,6 +11,7 @@ interface ExpenseRepository {
     suspend fun insertExpense(expense: Expense): Result<Unit>
     suspend fun updateExpense(expense: Expense): Result<Unit>
     suspend fun deleteExpense(firestoreId: String): Result<Unit> // ✅ Sửa ở đây thành String
+    suspend fun syncPendingExpenses(): Result<Unit>
     fun getExpenseById(id: Long): Flow<Result<Expense?>>
     
     fun getExpenseByFirestoreId(firestoreId: String): Flow<Result<Expense?>>

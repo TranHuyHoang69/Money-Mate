@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,12 +42,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.moneymate.StringRes
 import com.example.moneymate.ui.theme.stringResource
+import com.example.moneymate.util.BiometricAuthHelper
 import com.example.moneymate.viewmodel.SecurityViewModel
-import java.util.concurrent.Executors
 
 @Composable
 fun AuthLockScreen(
@@ -62,23 +62,56 @@ fun AuthLockScreen(
 
     val pinLength = 4
     var pinInput by remember { mutableStateOf("") }
+    var biometricPromptShown by remember { mutableStateOf(false) }
+    var biometricUnavailableNotified by remember { mutableStateOf(false) }
     val isBiometricEnabled = securityState.biometricEnabled
+    val biometricStatus = remember(context, isBiometricEnabled) {
+        if (isBiometricEnabled) {
+            BiometricAuthHelper.canAuthenticate(context)
+        } else {
+            null
+        }
+    }
+    val isBiometricAvailable = biometricStatus?.let(BiometricAuthHelper::isAvailable) == true
 
     fun showBiometricPrompt() {
-        val activity = context as? FragmentActivity ?: return
-        val executor = Executors.newSingleThreadExecutor()
+        val status = BiometricAuthHelper.canAuthenticate(context)
+        if (!BiometricAuthHelper.isAvailable(status)) {
+            Toast.makeText(context, BiometricAuthHelper.statusMessage(status), Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        val biometricPrompt = BiometricPrompt(activity, executor,
+        val activity = BiometricAuthHelper.findFragmentActivity(context)
+        if (activity == null) {
+            Toast.makeText(
+                context,
+                "Khong the mo xac thuc sinh trac hoc. Vui long dung PIN.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val biometricPrompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(context),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
-                    activity.runOnUiThread {
-                        onAuthSuccess()
-                    }
+                    onAuthSuccess()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
+                    if (!BiometricAuthHelper.isUserCancelError(errorCode)) {
+                        Toast.makeText(context, errString, Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(
+                        context,
+                        "Khong nhan dien duoc sinh trac hoc. Vui long thu lai hoac dung PIN.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             })
 
@@ -86,15 +119,25 @@ fun AuthLockScreen(
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle(context.getString(StringRes.auth_title))
             .setSubtitle(context.getString(StringRes.auth_subtitle))
+            .setAllowedAuthenticators(BiometricAuthHelper.AUTHENTICATORS)
             .setNegativeButtonText(context.getString(StringRes.use_pin_fallback))
             .build()
 
         biometricPrompt.authenticate(promptInfo)
     }
 
-    LaunchedEffect(isBiometricEnabled) {
-        if (isBiometricEnabled) {
+    LaunchedEffect(isBiometricEnabled, isBiometricAvailable) {
+        if (isBiometricEnabled && isBiometricAvailable && !biometricPromptShown) {
+            biometricPromptShown = true
             showBiometricPrompt()
+        } else if (
+            isBiometricEnabled &&
+            !isBiometricAvailable &&
+            biometricStatus != null &&
+            !biometricUnavailableNotified
+        ) {
+            biometricUnavailableNotified = true
+            Toast.makeText(context, BiometricAuthHelper.statusMessage(biometricStatus), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -194,7 +237,7 @@ fun AuthLockScreen(
                                     modifier = Modifier.size(70.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isBiometricEnabled) {
+                                    if (isBiometricEnabled && isBiometricAvailable) {
                                         IconButton(
                                             onClick = { showBiometricPrompt() },
                                             modifier = Modifier.size(70.dp)
@@ -219,7 +262,7 @@ fun AuthLockScreen(
                                         modifier = Modifier.size(70.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Backspace,
+                                            imageVector = Icons.AutoMirrored.Filled.Backspace,
                                             contentDescription = stringResource(StringRes.delete_btn), // ✅ Sửa lỗi compile nhãn id =
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(28.dp)

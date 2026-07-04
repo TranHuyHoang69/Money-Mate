@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,23 +62,14 @@ fun AddReminderScreen(
     viewModel: ReminderViewModel,
     onBackClick: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-
     var title by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
 
     // --- XỬ LÝ i18n CHO DANH SÁCH TẦN SUẤT ---
-    val repeatOptions = remember {
-        listOf(
-            "ONCE" to StringRes.repeat_once,
-            "DAILY" to StringRes.repeat_daily,
-            "WEEKLY" to StringRes.repeat_weekly,
-            "MONTHLY" to StringRes.repeat_monthly
-        )
-    }
+    val repeatOptions = stringArrayResource(StringRes.reminder_repeat_options)
 
     var repeatExpanded by remember { mutableStateOf(false) }
-    var selectedRepeatKey by remember { mutableStateOf(repeatOptions[0].first) }
+    var selectedRepeatIndex by remember { mutableStateOf(0) }
 
     val calendar = remember { Calendar.getInstance() }
     var selectedDate by remember { mutableStateOf(calendar.time) }
@@ -283,8 +275,7 @@ fun AddReminderScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val currentLabelRes = repeatOptions.find { it.first == selectedRepeatKey }?.second ?: StringRes.repeat_once
-                                Text(text = stringResource(currentLabelRes), color = MaterialTheme.colorScheme.primary, fontSize = 18.sp) // ✅ Sửa lỗi compile nhãn id =
+                                Text(text = repeatOptions.getOrElse(selectedRepeatIndex) { "" }, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp) // ✅ Sửa lỗi compile nhãn id =
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = repeatExpanded)
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -301,17 +292,17 @@ fun AddReminderScreen(
                             onDismissRequest = { repeatExpanded = false },
                             modifier = Modifier.fillMaxWidth(0.6f).background(MaterialTheme.colorScheme.surface)
                         ) {
-                            repeatOptions.forEach { (optionKey, optionResId) ->
+                            repeatOptions.forEachIndexed { index, option ->
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = stringResource(optionResId), // ✅ Sửa lỗi compile nhãn id =
-                                            color = if (optionKey == selectedRepeatKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            text = option, // ✅ Sửa lỗi compile nhãn id =
+                                            color = if (index == selectedRepeatIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             fontSize = 16.sp
                                         )
                                     },
                                     onClick = {
-                                        selectedRepeatKey = optionKey
+                                        selectedRepeatIndex = index
                                         repeatExpanded = false
                                     }
                                 )
@@ -396,8 +387,7 @@ fun AddReminderScreen(
                         }
 
                         // Trích xuất ngôn ngữ thuần qua ngữ cảnh Context để lập lịch chính xác
-                        val currentLabelRes = repeatOptions.find { it.first == selectedRepeatKey }?.second ?: StringRes.repeat_once
-                        val localizedRepeatValue = context.getString(currentLabelRes)
+                        val localizedRepeatValue = repeatOptions.getOrElse(selectedRepeatIndex) { "" }
 
                         viewModel.createReminder(
                             title = title,
@@ -432,3 +422,4 @@ private fun contextGetStringFallback(resId: Int): String {
         ""
     }
 }
+

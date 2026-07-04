@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.moneymate.ui.screen
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -59,11 +61,13 @@ import androidx.navigation.NavController
 import com.example.moneymate.R
 import com.example.moneymate.StringRes
 import com.example.moneymate.ui.navigation.Screen
-import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,22 +86,29 @@ fun LoginScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        android.util.Log.d("GoogleAuth", "Activity result: ${result.resultCode}")
         try {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             val account = task.getResult(ApiException::class.java)
-
-            android.util.Log.d("GoogleAuth", "Google sign-in successful: ${account.email}")
             val idToken = account.idToken
-
             if (idToken != null) {
-                android.util.Log.d("GoogleAuth", "ID Token obtained, signing in with Firebase...")
                 viewModel.signInWithFirebase(idToken)
             } else {
-                android.util.Log.e("GoogleAuth", "No ID token received")
+                viewModel.onGoogleLoginError("Không thể lấy token đăng nhập Google")
             }
         } catch (e: ApiException) {
-            android.util.Log.e("GoogleAuth", "Google sign-in failed: ${e.statusCode} - ${e.message}")
+            android.util.Log.e("GoogleAuth", "Google sign-in failed: ${e.statusCode}", e)
+            val message = when (e.statusCode) {
+                GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Bạn đã hủy đăng nhập Google"
+                GoogleSignInStatusCodes.SIGN_IN_CURRENTLY_IN_PROGRESS -> {
+                    "Google đang xử lý đăng nhập, vui lòng thử lại sau"
+                }
+                CommonStatusCodes.NETWORK_ERROR -> "Không có kết nối mạng, vui lòng thử lại"
+                else -> "Không thể đăng nhập Google (${e.statusCode})"
+            }
+            viewModel.onGoogleLoginError(message)
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleAuth", "Google sign-in error: ${e.message}", e)
+            viewModel.onGoogleLoginError(e.message ?: "Không thể đăng nhập Google")
         }
     }
 
@@ -122,26 +133,28 @@ fun LoginScreen(
                 )
             )
     ) {
-        Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-
-            // Header Section
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Spacer(modifier = Modifier.weight(0.3f))
             Text(
-                text = stringResource(StringRes.app_name), // ✅ Sửa lỗi compile nhãn id =
+                text = stringResource(StringRes.app_name),
                 fontSize = 42.sp,
                 fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onPrimary // ✅ Đồng bộ màu chữ trên nền Primary thích ứng
+                color = MaterialTheme.colorScheme.onPrimary
             )
             Text(
-                text = stringResource(StringRes.login_slogan), // ✅ Sửa lỗi compile nhãn id =
+                text = stringResource(StringRes.login_slogan),
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) // ✅ Đồng bộ màu chữ thích ứng hệ thống
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
             )
             Spacer(modifier = Modifier.weight(0.1f))
 
-            // Form Content bọc bên trong Surface
             Surface(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
@@ -154,14 +167,13 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = stringResource(StringRes.login_welcome_title), // ✅ Sửa lỗi compile nhãn id =
+                        text = stringResource(StringRes.login_welcome_title),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 1. Ô nhập Email cô lập Recomposition
                     EmailInputField(
                         value = emailState,
                         onValueChange = { emailState = it }
@@ -169,7 +181,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. Ô nhập Mật khẩu cô lập Recomposition
                     PasswordInputField(
                         value = passwordState,
                         onValueChange = { passwordState = it }
@@ -180,19 +191,22 @@ fun LoginScreen(
                             text = uiState.error,
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 8.dp).align(Alignment.Start)
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .align(Alignment.Start)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // 3. Nút Đăng nhập hệ thống
                     Button(
                         onClick = {
                             focusManager.clearFocus()
                             viewModel.login(emailState, passwordState)
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = !uiState.isLoading,
                         colors = ButtonDefaults.buttonColors(
@@ -201,19 +215,28 @@ fun LoginScreen(
                         )
                     ) {
                         if (uiState.isLoading) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         } else {
-                            Text(text = stringResource(StringRes.login_btn), fontWeight = FontWeight.Bold, fontSize = 16.sp) // ✅ Sửa lỗi compile nhãn id =
+                            Text(
+                                text = stringResource(StringRes.login_btn),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Điều hướng sang màn hình đăng ký
                     Row {
-                        Text(text = stringResource(StringRes.no_account), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
                         Text(
-                            text = stringResource(StringRes.register_btn), // ✅ Sửa lỗi compile nhãn id =
+                            text = stringResource(StringRes.no_account),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = stringResource(StringRes.register_btn),
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable { navController.navigate("register") }
@@ -222,21 +245,31 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        Text(text = stringResource(StringRes.or_separator), modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) // ✅ Sửa lỗi compile nhãn id =
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = stringResource(StringRes.or_separator),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // 4. Nút đăng nhập Google thích ứng
-                    GoogleSignInButton(
+                    GoogleLoginButton(
                         onClick = {
                             focusManager.clearFocus()
+                            viewModel.setGoogleLoginLoading()
                             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                .requestIdToken("458037840211-8591f2k268qa9cfr5q0uefuss5tcd0qh.apps.googleusercontent.com")
+                                .requestIdToken(context.getString(R.string.default_web_client_id))
                                 .requestEmail()
                                 .build()
-
                             val googleSignInClient = GoogleSignIn.getClient(context, gso)
                             googleSignInLauncher.launch(googleSignInClient.signInIntent)
                         },
@@ -253,8 +286,8 @@ fun EmailInputField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(text = stringResource(StringRes.email_label)) }, // ✅ Sửa lỗi compile nhãn id =
-        placeholder = { Text(text = stringResource(StringRes.email_hint)) }, // ✅ Sửa lỗi compile nhãn id =
+        label = { Text(text = stringResource(StringRes.email_label)) },
+        placeholder = { Text(text = stringResource(StringRes.email_hint)) },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         singleLine = true,
@@ -268,13 +301,21 @@ fun PasswordInputField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(text = stringResource(StringRes.password_label)) }, // ✅ Sửa lỗi compile nhãn id =
-        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        label = { Text(text = stringResource(StringRes.password_label)) },
+        visualTransformation = if (passwordVisible) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
         trailingIcon = {
             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                 Icon(
-                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = stringResource(StringRes.toggle_password_visibility_desc) // ✅ Sửa lỗi compile nhãn id =
+                    imageVector = if (passwordVisible) {
+                        Icons.Filled.Visibility
+                    } else {
+                        Icons.Filled.VisibilityOff
+                    },
+                    contentDescription = stringResource(StringRes.toggle_password_visibility_desc)
                 )
             }
         },
@@ -286,7 +327,7 @@ fun PasswordInputField(value: String, onValueChange: (String) -> Unit) {
 }
 
 @Composable
-fun GoogleSignInButton(
+fun GoogleLoginButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false
@@ -295,8 +336,14 @@ fun GoogleSignInButton(
         onClick = { if (!isLoading) onClick() },
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-        color = if (isLoading) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant,
-        modifier = modifier.fillMaxWidth().height(50.dp)
+        color = if (isLoading) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -304,17 +351,21 @@ fun GoogleSignInButton(
             modifier = Modifier.padding(horizontal = 12.dp)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             } else {
                 Icon(
                     painter = painterResource(R.drawable.ic_google),
-                    contentDescription = stringResource(StringRes.login_with_google), // ✅ Sửa lỗi compile nhãn id =
+                    contentDescription = stringResource(StringRes.login_with_google),
                     modifier = Modifier.size(24.dp),
                     tint = Color.Unspecified
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = stringResource(StringRes.continue_with_google_btn), // ✅ Sửa lỗi compile nhãn id =
+                    text = stringResource(StringRes.continue_with_google_btn),
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )

@@ -116,6 +116,14 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    fun showDate(timestamp: Long) {
+        calendarMode = CalendarMode.DAY
+        referenceDate = Calendar.getInstance().apply {
+            timeInMillis = timestamp
+        }
+        loadData()
+    }
+
     fun moveNext() {
         if (!isNextEnabled() || calendarMode == CalendarMode.CUSTOM) return
         val newDate = referenceDate.clone() as Calendar
@@ -159,23 +167,25 @@ class HistoryViewModel @Inject constructor(
     private fun getStartEndTimestamp(): Pair<Long, Long> {
         val start = referenceDate.clone() as Calendar
         val end = referenceDate.clone() as Calendar
-        start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0); start.set(Calendar.SECOND, 0)
-        end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59); end.set(Calendar.SECOND, 59)
+        start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0); start.set(Calendar.SECOND, 0); start.set(Calendar.MILLISECOND, 0)
+        end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59); end.set(Calendar.SECOND, 59); end.set(Calendar.MILLISECOND, 999)
 
         when (calendarMode) {
             CalendarMode.WEEK -> {
                 start.set(Calendar.DAY_OF_WEEK, start.firstDayOfWeek)
                 end.timeInMillis = start.timeInMillis
                 end.add(Calendar.DAY_OF_YEAR, 6)
-                end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59)
+                end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59); end.set(Calendar.SECOND, 59); end.set(Calendar.MILLISECOND, 999)
             }
             CalendarMode.MONTH -> {
                 start.set(Calendar.DAY_OF_MONTH, 1)
                 end.set(Calendar.DAY_OF_MONTH, end.getActualMaximum(Calendar.DAY_OF_MONTH))
+                end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59); end.set(Calendar.SECOND, 59); end.set(Calendar.MILLISECOND, 999)
             }
             CalendarMode.YEAR -> {
                 start.set(Calendar.DAY_OF_YEAR, 1)
                 end.set(Calendar.DAY_OF_YEAR, end.getActualMaximum(Calendar.DAY_OF_YEAR))
+                end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59); end.set(Calendar.SECOND, 59); end.set(Calendar.MILLISECOND, 999)
             }
             else -> {}
         }

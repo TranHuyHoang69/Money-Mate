@@ -278,6 +278,25 @@ object StringRes {
     val sort_latest_with_desc = R.string.sort_latest_with_desc
     val sort_amount_desc_with_desc = R.string.sort_amount_desc_with_desc
 
+    val nav_statistics = R.string.nav_statistics
+    val statistics_overview = R.string.statistics_overview
+    val statistics_expense = R.string.statistics_expense
+    val statistics_income = R.string.statistics_income
+    val statistics_day = R.string.statistics_day
+    val statistics_week = R.string.statistics_week
+    val statistics_month = R.string.statistics_month
+    val statistics_year = R.string.statistics_year
+    val statistics_total_income = R.string.statistics_total_income
+    val statistics_total_expense = R.string.statistics_total_expense
+    val statistics_profit = R.string.statistics_profit
+    val statistics_loss = R.string.statistics_loss
+    val statistics_category_detail = R.string.statistics_category_detail
+    val statistics_no_data = R.string.statistics_no_data
+    val statistics_no_expense = R.string.statistics_no_expense
+    val statistics_no_income = R.string.statistics_no_income
+    val statistics_error_loading = R.string.statistics_error_loading
+    val statistics_transactions_count = R.string.statistics_transactions_count
+
     //other
     val select_date_hint = R.string.select_date_hint
     val error_format = R.string.error_format

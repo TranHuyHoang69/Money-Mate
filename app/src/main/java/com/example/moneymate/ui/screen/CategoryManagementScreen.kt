@@ -35,6 +35,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,11 +52,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.moneymate.StringRes       // ✅ Bộ quản lý ID tài nguyên chuỗi tập trung
+import android.widget.Toast
+import com.example.moneymate.StringRes
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
-import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.CategoryViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import rememberCategoryIcon
 
@@ -67,16 +71,23 @@ fun CategoryManagementScreen(
     onOpenDrawer: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    // Lấy dữ liệu từ database Room thông qua ViewModel
     val allEntities by viewModel.allCategories.collectAsState(initial = emptyList())
+    val categoryError by viewModel.categoryError.collectAsState(initial = null)
 
-    // Chuyển đổi Entity sang Domain Model để vẽ UI
+    LaunchedEffect(categoryError) {
+        val message = categoryError ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        viewModel.clearCategoryError()
+    }
+
     val allCategories by remember(allEntities) {
         derivedStateOf {
             allEntities.map { entity ->
                 Category(
                     id = entity.categoryId,
+                    stableId = entity.stableId,
                     title = entity.title,
                     iconResName = entity.iconResName,
                     colorHex = entity.colorHex,
@@ -90,7 +101,6 @@ fun CategoryManagementScreen(
     val spendList = remember(allCategories) { allCategories.filter { it.type == TransactionType.SPEND } }
     val incomeList = remember(allCategories) { allCategories.filter { it.type == TransactionType.INCOME } }
 
-    // ✅ i18n: Chuyển đổi mảng Tab cứng sang danh sách ID chuỗi để hỗ trợ đa ngôn ngữ linh hoạt
     val tabs = remember { listOf(StringRes.expenses, StringRes.income) }
     val pagerState = rememberPagerState(initialPage = if (initialType == "INCOME") 1 else 0) { tabs.size }
 
@@ -99,7 +109,7 @@ fun CategoryManagementScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(color = MaterialTheme.colorScheme.primaryContainer) // ✅ Thay đổi sang màu hệ thống
+                    .background(color = MaterialTheme.colorScheme.primaryContainer)
                     .padding(horizontal = 16.dp, vertical = 20.dp)
                     .height(56.dp)
             ) {
@@ -110,14 +120,14 @@ fun CategoryManagementScreen(
                     IconButton(onClick = onOpenDrawer) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = stringResource(StringRes.menu_icon_desc), // ✅ Sửa lỗi compile nhãn id =
+                            contentDescription = stringResource(StringRes.menu_icon_desc),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = stringResource(StringRes.category_management), // ✅ Sửa lỗi compile nhãn id =
+                        text = stringResource(StringRes.category_management),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold
@@ -128,14 +138,13 @@ fun CategoryManagementScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            // --- THANH CHUYỂN TAB ---
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
-                containerColor = MaterialTheme.colorScheme.surfaceContainer, // ✅ Đồng bộ màu Container của Tab theo chuẩn M3
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                        color = MaterialTheme.colorScheme.primary // ✅ Thanh chỉ báo chạy theo màu primary hệ thống
+                        color = MaterialTheme.colorScheme.primary
                     )
                 },
                 divider = {}
@@ -146,8 +155,8 @@ fun CategoryManagementScreen(
                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                         text = {
                             Text(
-                                text = stringResource(resId).uppercase(), // ✅ Sửa lỗi compile nhãn id =
-                                color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, // ✅ Thích ứng DarkMode tốt hơn Gray cố định
+                                text = stringResource(resId).uppercase(),
+                                color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -155,21 +164,27 @@ fun CategoryManagementScreen(
                 }
             }
 
-            // --- NỘI DUNG VUỐT PAGER ---
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 val currentList = if (page == 0) spendList else incomeList
                 val currentType = if (page == 0) "SPEND" else "INCOME"
 
                 CategoryGrid(
                     categories = currentList,
+                    navController = navController,
                     onCategoryClick = { selectedCategory ->
-                        navController.previousBackStackEntry?.savedStateHandle?.let { handle ->
-                            handle["selected_category_id"] = selectedCategory.id
-                            handle["selected_category_title"] = selectedCategory.title
-                            handle["selected_category_icon"] = selectedCategory.iconResName
-                            handle["selected_category_color"] = selectedCategory.colorHex
+                        scope.launch {
+                            // ✅ FIX: Thêm delay 100ms để đảm bảo SavedStateHandle đã ready
+                            delay(100)
+
+                            navController.previousBackStackEntry?.savedStateHandle?.let { handle ->
+                                handle["selected_category_id"] = selectedCategory.id
+                                handle["selected_category_stable_id"] = selectedCategory.stableId
+                                handle["selected_category_title"] = selectedCategory.title
+                                handle["selected_category_icon"] = selectedCategory.iconResName
+                                handle["selected_category_color"] = selectedCategory.colorHex
+                            }
+                            navController.popBackStack()
                         }
-                        navController.popBackStack()
                     },
                     onAddClick = {
                         navController.navigate("add_category/$currentType")
@@ -183,6 +198,7 @@ fun CategoryManagementScreen(
 @Composable
 fun CategoryGrid(
     categories: List<Category>,
+    navController: NavController,
     onCategoryClick: (Category) -> Unit,
     onAddClick: () -> Unit
 ) {
@@ -196,11 +212,13 @@ fun CategoryGrid(
         items(categories) { category ->
             CategoryItemView(
                 category = category,
-                modifier = Modifier.clickable { onCategoryClick(category) }
+                // ✅ FIX: Thêm enabled check để tránh click liên tục
+                modifier = Modifier.clickable(enabled = true) {
+                    onCategoryClick(category)
+                }
             )
         }
 
-        // Nút bấm "Tạo" danh mục mới
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -209,19 +227,19 @@ fun CategoryGrid(
                 Box(
                     modifier = Modifier
                         .size(60.dp)
-                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape), // ✅ Đồng bộ Container nút Add theo M3 thay vì màu vàng cứng
+                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(StringRes.add_category), // ✅ Sửa lỗi compile nhãn id =
+                        contentDescription = stringResource(StringRes.add_category),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(32.dp)
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(StringRes.create), // ✅ Sửa lỗi compile nhãn id =
+                    text = stringResource(StringRes.create),
                     color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 13.sp
                 )

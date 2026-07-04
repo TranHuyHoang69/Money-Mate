@@ -13,8 +13,9 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// 🌟 SỬA TẠI ĐÂY: Đổi tên thành userPrefsDataStore để tránh xung đột Top-level với security_prefs
-private val Context.userPrefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+private val Context.userPrefsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "user_preferences"
+)
 
 @Singleton
 class PreferencesLocalDataSource @Inject constructor(
@@ -23,7 +24,6 @@ class PreferencesLocalDataSource @Inject constructor(
     private val languageKey = stringPreferencesKey("language_key")
     private val themeKey = stringPreferencesKey("theme_key")
 
-    // 🌟 SỬA TẠI ĐÂY: Gọi đúng userPrefsDataStore
     val userPreferencesFlow: Flow<UserPreferences> = context.userPrefsDataStore.data.map { preferences ->
         UserPreferences(
             language = preferences[languageKey] ?: "vi",
@@ -32,14 +32,12 @@ class PreferencesLocalDataSource @Inject constructor(
     }
 
     suspend fun updateLanguage(language: String) {
-        // 🌟 SỬA TẠI ĐÂY: Gọi đúng userPrefsDataStore
         context.userPrefsDataStore.edit { preferences ->
             preferences[languageKey] = language
         }
     }
 
     suspend fun updateThemeMode(themeMode: String) {
-        // 🌟 SỬA TẠI ĐÂY: Gọi đúng userPrefsDataStore
         context.userPrefsDataStore.edit { preferences ->
             preferences[themeKey] = themeMode
         }

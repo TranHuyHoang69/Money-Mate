@@ -1,6 +1,7 @@
 package com.example.moneymate.ui.screen
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,10 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +62,10 @@ import com.example.moneymate.StringRes
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.ui.navigation.HomeNavKeys
+import com.example.moneymate.ui.navigation.ReceiptScanNavKeys
+import com.example.moneymate.ui.navigation.Screen
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.viewmodel.AddExpenseEvent
 import com.example.moneymate.viewmodel.AddExpenseUiEvent
 import com.example.moneymate.viewmodel.AddExpenseViewModel
@@ -79,7 +86,8 @@ fun AddScreen(
     val state = viewModel.uiState
 
     // ✅ ĐÃ SỬA: Ép cứng màu xanh thương hiệu cố định cho thanh Header, giống hoàn toàn với UpdateScreen
-    val themeColor = remember { Color(0xFF006C4C) }
+    val themeColor = AppTopBarColor
+    val context = LocalContext.current
 
     // Luồng lắng nghe sự kiện Save thành công
     LaunchedEffect(key1 = Unit) {
@@ -87,7 +95,15 @@ fun AddScreen(
             android.util.Log.d("MONEYMATE_DEBUG", "Đã nhận sự kiện trên UI: $event")
             when(event){
                 is AddExpenseUiEvent.SaveSuccess -> {
+                    event.timestamp?.let { savedTimestamp ->
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(HomeNavKeys.SAVED_TRANSACTION_DATE_MILLIS, savedTimestamp)
+                    }
                     navController.popBackStack()
+                }
+                is AddExpenseUiEvent.ShowError -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -95,17 +111,38 @@ fun AddScreen(
 
     // Luồng lắng nghe dữ liệu danh mục truyền ngược về thông qua SavedStateHandle
     val navBackStackEntry = navController.currentBackStackEntry
-    LaunchedEffect(navBackStackEntry) {
-        val savedStateHandle = navBackStackEntry?.savedStateHandle
+    val savedStateHandle = navBackStackEntry?.savedStateHandle
+    val receiptAmountState = savedStateHandle
+        ?.getStateFlow<String?>(ReceiptScanNavKeys.AMOUNT, null)
+        ?.collectAsState()
+    val receiptDateMillisState = savedStateHandle
+        ?.getStateFlow<Long?>(ReceiptScanNavKeys.DATE_MILLIS, null)
+        ?.collectAsState()
+    val receiptNoteState = savedStateHandle
+        ?.getStateFlow<String?>(ReceiptScanNavKeys.NOTE, null)
+        ?.collectAsState()
+    val receiptCategoryTitleState = savedStateHandle
+        ?.getStateFlow<String?>(ReceiptScanNavKeys.CATEGORY_TITLE, null)
+        ?.collectAsState()
+
+    LaunchedEffect(
+        navBackStackEntry,
+        receiptAmountState?.value,
+        receiptDateMillisState?.value,
+        receiptNoteState?.value,
+        receiptCategoryTitleState?.value
+    ) {
         val categoryId = savedStateHandle?.get<Long>("selected_category_id")
 
         if (categoryId != null) {
+            val stableId = savedStateHandle.get<String>("selected_category_stable_id").orEmpty()
             val title = savedStateHandle.get<String>("selected_category_title").orEmpty()
             val iconResName = savedStateHandle.get<String>("selected_category_icon").orEmpty()
             val colorHex = savedStateHandle.get<String>("selected_category_color").orEmpty()
 
             val returnedCategory = Category(
                 id = categoryId,
+                stableId = stableId,
                 title = title,
                 iconResName = iconResName,
                 colorHex = colorHex,
@@ -116,9 +153,31 @@ fun AddScreen(
             viewModel.onEvent(AddExpenseEvent.SelectCategory(returnedCategory))
 
             savedStateHandle.remove<Long>("selected_category_id")
+            savedStateHandle.remove<String>("selected_category_stable_id")
             savedStateHandle.remove<String>("selected_category_title")
             savedStateHandle.remove<String>("selected_category_icon")
             savedStateHandle.remove<String>("selected_category_color")
+        }
+
+        val receiptAmount = receiptAmountState?.value
+        val receiptDateMillis = receiptDateMillisState?.value
+        val receiptNote = receiptNoteState?.value
+        val receiptCategoryTitle = receiptCategoryTitleState?.value
+
+        if (receiptAmount != null || receiptDateMillis != null || receiptNote != null || receiptCategoryTitle != null) {
+            viewModel.onEvent(
+                AddExpenseEvent.ApplyReceiptScanResult(
+                    amount = receiptAmount,
+                    dateMillis = receiptDateMillis,
+                    note = receiptNote,
+                    categoryTitle = receiptCategoryTitle
+                )
+            )
+
+            savedStateHandle?.remove<String>(ReceiptScanNavKeys.AMOUNT)
+            savedStateHandle?.remove<Long>(ReceiptScanNavKeys.DATE_MILLIS)
+            savedStateHandle?.remove<String>(ReceiptScanNavKeys.NOTE)
+            savedStateHandle?.remove<String>(ReceiptScanNavKeys.CATEGORY_TITLE)
         }
     }
 
@@ -172,7 +231,7 @@ fun HeaderAdd(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Default.ArrowBack,
+                Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = backDescText,
                 tint = Color.White,
                 modifier = Modifier
@@ -244,6 +303,7 @@ fun FormSection(
             Spacer(modifier = Modifier.height(8.dp))
             AmountInputField(
                 amount = state.amount,
+                amountError = state.amountError,
                 themeColor = themeColor,
                 onAmountChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) }
             )
@@ -251,6 +311,31 @@ fun FormSection(
         }
 
         // 2. Phần danh mục
+        item(key = "receipt_scan_button") {
+            Button(
+                onClick = { navController.navigate(Screen.ReceiptScan.route) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = themeColor.copy(alpha = 0.12f),
+                    contentColor = themeColor
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ImageSearch,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Quét hóa đơn",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
         item(key = "category_section") {
             Text(text = categoryManagementLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
@@ -298,7 +383,7 @@ fun FormSection(
                 modifier = Modifier.fillMaxWidth().height(60.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor),
-                enabled = state.amount.isNotBlank() && state.selectedCategory != null
+                enabled = state.isAmountValid && state.selectedCategory != null
             ) {
                 Text(text = confirmBtnText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             }
@@ -338,36 +423,51 @@ fun CategoryGrid(
         gridRows.forEachIndexed { rowIndex, rowItems ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                // ✅ ĐÃ SỬA: Căn các phần tử trong hàng thẳng hàng theo trục ngang
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
                 rowItems.forEach { category ->
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .key(category.id ?: 0L)
+                            .padding(4.dp), // Thêm chút padding đồng bộ nếu cần
+                        contentAlignment = Alignment.Center // Giúp nội dung trong Box cân bằng
                     ) {
                         CategoryItem(
                             category = category,
-                            themeColor = themeColor,
+                            themeColor = MaterialTheme.colorScheme.onSurface,
                             isSelected = selectedCategory?.id == category.id,
                             onClick = { onCategorySelect(category) }
                         )
                     }
                 }
 
+                // Trường hợp hàng cuối cùng chưa đủ 4 phần tử (Thêm nút Xem thêm vào chỗ trống)
                 if (rowIndex == gridRows.lastIndex && rowItems.size < 4) {
-                    Box(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center // ✅ ĐÃ SỬA: Căn nút vào giữa Box
+                    ) {
                         AddCategoryButton(viewMoreText, onSeeMoreClick)
                     }
+                    // Giữ khoảng trống đều cho các ô còn lại
                     repeat(4 - rowItems.size - 1) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
 
+        // Trường hợp số lượng item chia hết cho 4 (Nút Xem thêm nằm riêng một hàng mới)
         val totalTaken = gridRows.flatten().size
         if (totalTaken > 0 && totalTaken % 4 == 0) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically // ✅ ĐÃ SỬA: Thống nhất trục dọc hàng mới
+            ) {
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center // ✅ ĐÃ SỬA: Căn nút vào giữa Box
+                ) {
                     AddCategoryButton(viewMoreText, onSeeMoreClick)
                 }
                 repeat(3) { Spacer(Modifier.weight(1f)) }
@@ -462,7 +562,7 @@ fun CategoryItem(
         Text(
             text = category.title,
             fontSize = 11.sp,
-            color = if (isSelected) categoryColor else Color.DarkGray,
+            color = if (isSelected) categoryColor else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1
@@ -500,7 +600,12 @@ fun showDatePicker(context: Context, onDateSelected: (Long) -> Unit) {
 }
 
 @Composable
-fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String) -> Unit) {
+fun AmountInputField(
+    amount: String,
+    amountError: String?,
+    themeColor: Color,
+    onAmountChange: (String) -> Unit
+) {
     OutlinedTextField(
         value = amount,
         onValueChange = onAmountChange,
@@ -510,6 +615,10 @@ fun AmountInputField(amount: String, themeColor: Color, onAmountChange: (String)
         trailingIcon = { Text("₫", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = themeColor) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = amountError != null,
+        supportingText = amountError?.let { errorMessage ->
+            { Text(text = errorMessage) }
+        },
         shape = RoundedCornerShape(20.dp),
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor),
         visualTransformation = ThousandSeparatorTransformation()

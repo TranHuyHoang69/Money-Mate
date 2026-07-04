@@ -14,12 +14,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.DrawerState
@@ -192,12 +195,48 @@ fun AppDrawer(
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
+                    // --- MỤC THỐNG KÊ ---
+                    NavigationDrawerItem(
+                        label = { Text(text = stringResource(StringRes.nav_statistics)) },
+                        selected = currentRoute == Screen.Statistics.route,
+                        icon = { Icon(Icons.Default.BarChart, null) },
+                        colors = drawerItemColors,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (isLoggedIn) onNavigate(Screen.Statistics.route) else onNavigate(Screen.Login.route)
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
 
                     // --- MỤC DANH MỤC ---
                     NavigationDrawerItem(
+                        label = { Text(text = "Ngân sách") },
+                        selected = currentRoute == Screen.Budget.route,
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, null) },
+                        colors = drawerItemColors,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (isLoggedIn) onNavigate(Screen.Budget.route) else onNavigate(Screen.Login.route)
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text(text = "Giao dịch định kỳ") },
+                        selected = currentRoute == Screen.RecurringTransactions.route,
+                        icon = { Icon(Icons.Default.Repeat, null) },
+                        colors = drawerItemColors,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (isLoggedIn) onNavigate(Screen.RecurringTransactions.route) else onNavigate(Screen.Login.route)
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
                         label = { Text(text = stringResource(StringRes.nav_categories)) },
                         selected = currentRoute?.startsWith("category_management") == true,
-                        icon = { Icon(Icons.Default.List, null) },
+                        icon = { Icon(Icons.AutoMirrored.Filled.List, null) },
                         colors = drawerItemColors,
                         onClick = {
                             scope.launch { drawerState.close() }
@@ -252,7 +291,7 @@ fun AppDrawer(
                         NavigationDrawerItem(
                             label = { Text(text = stringResource(StringRes.nav_logout)) },
                             selected = false,
-                            icon = { Icon(Icons.Default.Logout, null) },
+                            icon = { Icon(Icons.AutoMirrored.Filled.Logout, null) },
                             onClick = {
                                 scope.launch { drawerState.close() }
                                 onLogout()

@@ -16,15 +16,11 @@ class SecurityRemoteDataSource @Inject constructor(
     private val docRef get() = firestore.collection("users").document(userId)
         .collection("security").document("settings")
 
-    suspend fun updateRemoteSettings(hash: String?, biometricEnabled: Boolean) {
+    suspend fun updateRemoteSettings(biometricEnabled: Boolean) {
         val data = hashMapOf(
-            "pinHash" to hash,
             "biometricEnabled" to biometricEnabled,
             "updatedAt" to Timestamp.now()
         )
-        if (hash != null) {
-            data["createdAt"] = Timestamp.now()
-        }
         docRef.set(data, SetOptions.merge()).await()
     }
 

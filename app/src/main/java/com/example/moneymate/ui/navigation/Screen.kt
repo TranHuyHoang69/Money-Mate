@@ -27,4 +27,11 @@ sealed class Screen(val route: String){
     object AuthLock : Screen("auth_lock")
     object Splash : Screen("splash")
     object Customization : Screen("customization")
+    object Statistics : Screen("statistics")
+    object Budget : Screen("budget")
+    object RecurringTransactions : Screen("recurring_transactions")
+    object RecurringTransactionAdd : Screen("recurring_transaction_add")
+    object RecurringTransactionEdit : Screen("recurring_transaction_edit/{transactionKey}")
+    object StatisticsDetail : Screen("statistics_detail/{categoryId}/{type}")
+    object ReceiptScan : Screen("receipt_scan")
 }

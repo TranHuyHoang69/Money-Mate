@@ -10,6 +10,6 @@ class GetAllCategoriesUseCase @Inject constructor(
     private val repository: ExpenseRepository
 ) {
     operator fun invoke(type: String): Flow<Result<List<Category>>> {
-        return repository.getAllCategories()
+        return repository.getCategoriesByType(type)
     }
 }

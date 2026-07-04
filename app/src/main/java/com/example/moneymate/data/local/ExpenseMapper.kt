@@ -2,6 +2,8 @@ package com.example.moneymate.data.local
 
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.Expense
+import com.example.moneymate.domain.model.ExpensePendingOperation
+import com.example.moneymate.domain.model.ExpenseSyncStatus
 import com.example.moneymate.domain.model.TransactionType
 
 /**
@@ -10,6 +12,7 @@ import com.example.moneymate.domain.model.TransactionType
 fun CategoryEntity.toDomain(): Category {
     return Category(
         id = this.categoryId,
+        stableId = this.stableId,
         title = this.title,
         iconResName = this.iconResName,
         colorHex = this.colorHex,
@@ -26,6 +29,7 @@ fun CategoryEntity.toDomain(): Category {
 fun Category.toEntity(userId: String): CategoryEntity {
     return CategoryEntity(
         categoryId = this.id,
+        stableId = this.stableId,
         userId = userId,
         title = this.title,
         iconResName = this.iconResName,
@@ -50,7 +54,23 @@ fun ExpenseWithCategory.toDomain(): Expense {
         amount = this.expense.amount,
         timestamp = this.expense.timestamp,
         note = this.expense.note,
-        category = this.categoryEntity.toDomain()
+        category = this.categoryEntity.toDomain(),
+        syncStatus = try {
+            ExpenseSyncStatus.valueOf(this.expense.syncStatus)
+        } catch (e: Exception) {
+            ExpenseSyncStatus.SYNCED
+        },
+        isDeleted = this.expense.isDeleted,
+        localUpdatedAt = this.expense.localUpdatedAt,
+        lastSyncError = this.expense.lastSyncError,
+        pendingOperation = try {
+            ExpensePendingOperation.valueOf(this.expense.pendingOperation)
+        } catch (e: Exception) {
+            pendingOperationFromStatus(this.expense.syncStatus)
+        },
+        remoteUpdatedAt = this.expense.remoteUpdatedAt,
+        lastSyncAttemptAt = this.expense.lastSyncAttemptAt,
+        retryCount = this.expense.retryCount
     )
 }
 
@@ -61,7 +81,25 @@ fun Expense.toEntity(): ExpenseEntity {
         type = this.type.name,
         amount = this.amount,
         categoryId = this.category.id,
+        categoryStableId = this.category.stableId,
         timestamp = this.timestamp,
-        note = this.note
+        note = this.note,
+        syncStatus = this.syncStatus.name,
+        isDeleted = this.isDeleted,
+        localUpdatedAt = this.localUpdatedAt,
+        lastSyncError = this.lastSyncError,
+        pendingOperation = this.pendingOperation.name,
+        remoteUpdatedAt = this.remoteUpdatedAt,
+        lastSyncAttemptAt = this.lastSyncAttemptAt,
+        retryCount = this.retryCount
     )
+}
+
+private fun pendingOperationFromStatus(syncStatus: String): ExpensePendingOperation {
+    return when (syncStatus) {
+        ExpenseSyncStatus.PENDING_CREATE.name -> ExpensePendingOperation.CREATE
+        ExpenseSyncStatus.PENDING_UPDATE.name -> ExpensePendingOperation.UPDATE
+        ExpenseSyncStatus.PENDING_DELETE.name -> ExpensePendingOperation.DELETE
+        else -> ExpensePendingOperation.NONE
+    }
 }

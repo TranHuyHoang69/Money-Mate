@@ -5,8 +5,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.moneymate.data.local.AppDatabase
+import com.example.moneymate.data.local.BudgetDao
 import com.example.moneymate.data.local.CategoryDao
 import com.example.moneymate.data.local.ExpenseDao
+import com.example.moneymate.data.local.RecurringTransactionDao
+import com.example.moneymate.data.local.ReceiptLearningPatternDao
 import com.example.moneymate.data.local.ReminderDao
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Module
@@ -27,7 +30,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, "expense-db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(*AppDatabase.ALL_MIGRATIONS)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
@@ -71,4 +74,18 @@ object DatabaseModule {
     fun provideReminderDao(database: AppDatabase): ReminderDao {
         return database.reminderDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideBudgetDao(database: AppDatabase): BudgetDao = database.budgetDao()
+
+    @Provides
+    @Singleton
+    fun provideRecurringTransactionDao(database: AppDatabase): RecurringTransactionDao =
+        database.recurringTransactionDao()
+
+    @Provides
+    @Singleton
+    fun provideReceiptLearningPatternDao(database: AppDatabase): ReceiptLearningPatternDao =
+        database.receiptLearningPatternDao()
 }

@@ -7,12 +7,11 @@ import javax.inject.Inject
 
 class AddExpenseUseCase @Inject constructor(
     private val expenseRepository: ExpenseRepository
-){
+) {
     suspend operator fun invoke(expense: Expense): Result<Unit> {
-        if(expense.amount <= 0){
-            return Result.Error("Số tiền không hợp lệ")
+        if (!ExpenseAmountValidator.isValidAmount(expense.amount)) {
+            return Result.Error(ExpenseAmountValidator.ERROR_MESSAGE)
         }
         return expenseRepository.insertExpense(expense)
-
     }
 }

@@ -43,7 +43,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,8 +58,10 @@ import com.example.moneymate.domain.model.GroupedExpense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.chart.MorphingChartSection
 import com.example.moneymate.ui.item.ExpenseItem
+import com.example.moneymate.ui.navigation.HomeNavKeys
 import com.example.moneymate.ui.navigation.Screen
-import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
+import com.example.moneymate.ui.theme.AppTopBarColor
+import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.viewmodel.AuthViewModel
 import com.example.moneymate.viewmodel.CalendarMode
 import com.example.moneymate.viewmodel.ChartData
@@ -78,17 +79,9 @@ fun HomeScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit
 ) {
-    // --- Data State ---
     val expensesByPeriod by historyViewModel.uiState.collectAsState()
     val isLoading by historyViewModel.isLoading.collectAsState()
-    val allExpensesResult by homeViewModel.expensesState.collectAsState()
     val authUiState by authViewModel.uiState.collectAsState()
-
-    LaunchedEffect(allExpensesResult, authUiState.isLoggedIn) {
-        if (authUiState.isLoggedIn) {
-            homeViewModel.reloadExpenses()
-        }
-    }
 
     LaunchedEffect(authUiState.isLoggedIn) {
         android.util.Log.d("HomeScreen", "Auth changed: ${authUiState.isLoggedIn}")
@@ -96,35 +89,37 @@ fun HomeScreen(
         homeViewModel.reloadExpenses()
     }
 
-    // --- UI State ---
     val scrollState = rememberLazyListState()
+    val typeSpendLabel = stringResource(StringRes.type_spend_upper)
+    val typeIncomeLabel = stringResource(StringRes.type_income_upper)
+    var selectedType by remember { mutableStateOf(TransactionType.SPEND) }
 
-    // Tải trước các chuỗi danh mục để tránh so sánh cứng chuỗi thô
-    val typeSpendKey = stringResource(StringRes.type_spend_upper) // ✅ Sửa lỗi compile nhãn id =
-    val typeIncomeKey = stringResource(StringRes.type_income_upper) // ✅ Sửa lỗi compile nhãn id =
-
-    var selectedType by remember(typeSpendKey) { mutableStateOf(typeSpendKey) }
-
-    // Đồng bộ dải màu theo chuẩn token Material 3 động thay vì nạp cứng mã màu HEX
     val spendColor = MaterialTheme.colorScheme.primary
     val incomeColor = MaterialTheme.colorScheme.tertiary
-    val themeColor = remember(selectedType, typeSpendKey, spendColor, incomeColor) {
-        if (selectedType == typeSpendKey) spendColor else incomeColor
+    val themeColor = remember(selectedType, spendColor, incomeColor) {
+        if (selectedType == TransactionType.SPEND) spendColor else incomeColor
     }
-    val scope = rememberCoroutineScope()
 
     var showDatePicker by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val savedTransactionDateState = savedStateHandle
+        ?.getStateFlow<Long?>(HomeNavKeys.SAVED_TRANSACTION_DATE_MILLIS, null)
+        ?.collectAsState()
 
-    // --- State sau tối ưu (Chạy dưới nền) ---
+    LaunchedEffect(savedTransactionDateState?.value) {
+        val savedTimestamp = savedTransactionDateState?.value ?: return@LaunchedEffect
+        historyViewModel.showDate(savedTimestamp)
+        savedStateHandle?.remove<Long>(HomeNavKeys.SAVED_TRANSACTION_DATE_MILLIS)
+    }
+
     val totalBalance by homeViewModel.totalBalance.collectAsState()
     var categoryGroupedList by remember { mutableStateOf<List<GroupedExpense>>(emptyList()) }
     var chartData by remember { mutableStateOf<List<ChartData>>(emptyList()) }
 
-    LaunchedEffect(expensesByPeriod, selectedType, typeSpendKey) {
+    LaunchedEffect(expensesByPeriod, selectedType) {
         withContext(Dispatchers.Default) {
-            val typeEnum = if (selectedType == typeSpendKey) TransactionType.SPEND else TransactionType.INCOME
-            val filtered = expensesByPeriod.filter { it.type == typeEnum }
+            val filtered = expensesByPeriod.filter { it.type == selectedType }
             val totalAmountOfPeriod = filtered.sumOf { it.amount }
 
             val groups = filtered.groupBy { it.category.id }.map { (_, items) ->
@@ -134,12 +129,16 @@ fun HomeScreen(
                     category = firstItem.category,
                     totalAmount = groupSum,
                     transactionCount = items.size,
-                    type = typeEnum
+                    type = selectedType
                 )
             }.sortedByDescending { it.totalAmount }
 
             val charts = groups.map {
-                val percentage = if (totalAmountOfPeriod > 0) (it.totalAmount / totalAmountOfPeriod * 100).toFloat() else 0f
+                val percentage = if (totalAmountOfPeriod > 0) {
+                    (it.totalAmount / totalAmountOfPeriod * 100).toFloat()
+                } else {
+                    0f
+                }
                 ChartData(it.category.title, it.totalAmount, percentage, it.category.colorHex)
             }
             Pair(groups, charts)
@@ -149,13 +148,14 @@ fun HomeScreen(
         }
     }
 
-    // Cô lập tính toán tiến trình Morph động khi cuộn
     val morphProgress by remember {
         derivedStateOf {
-            if (scrollState.firstVisibleItemIndex > 0) {
-                1f
-            } else {
-                (scrollState.firstVisibleItemScrollOffset / 400f).coerceIn(0f, 1f)
+            val hasScrolled = scrollState.firstVisibleItemIndex > 0 ||
+                scrollState.firstVisibleItemScrollOffset > 0
+            when {
+                scrollState.firstVisibleItemIndex > 0 -> 1f
+                hasScrolled && !scrollState.canScrollForward -> 1f
+                else -> (scrollState.firstVisibleItemScrollOffset / 180f).coerceIn(0f, 1f)
             }
         }
     }
@@ -173,32 +173,44 @@ fun HomeScreen(
                     }
                     showDatePicker = false
                 }) {
-                    Text(text = stringResource(StringRes.confirm_btn), color = themeColor, fontWeight = FontWeight.Bold) // ✅ Sửa lỗi compile nhãn id =
+                    Text(
+                        text = stringResource(StringRes.confirm_btn),
+                        color = themeColor,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text(text = stringResource(StringRes.cancel_btn), color = MaterialTheme.colorScheme.onSurfaceVariant) // ✅ Sửa lỗi compile nhãn id =
+                    Text(
+                        text = stringResource(StringRes.cancel_btn),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         ) {
             Box(modifier = Modifier.height(450.dp)) {
                 DateRangePicker(
                     state = dateRangePickerState,
-                    title = { Text(text = stringResource(StringRes.date_picker_range_title), modifier = Modifier.padding(16.dp)) } // ✅ Sửa lỗi compile nhãn id =
+                    title = {
+                        Text(
+                            text = stringResource(StringRes.date_picker_range_title),
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 )
             }
         }
     }
 
-    val currencyUnit = stringResource(StringRes.currency_unit) // ✅ Sửa lỗi compile nhãn id =
-    val transactionsCountTemplate = stringResource(StringRes.transactions_count_format) // ✅ Sửa lỗi compile nhãn id =
+    val currencyUnit = stringResource(StringRes.currency_unit)
+    val transactionsCountTemplate = stringResource(StringRes.transactions_count_format)
 
-    Box(modifier = Modifier.fillMaxSize().background(themeColor)) {
+    Box(modifier = Modifier.fillMaxSize().background(AppTopBarColor)) {
         HeaderSection(
             selectedType = selectedType,
-            typeSpendKey = typeSpendKey,
-            typeIncomeKey = typeIncomeKey,
+            typeSpendLabel = typeSpendLabel,
+            typeIncomeLabel = typeIncomeLabel,
             totalBalance = totalBalance,
             currencyUnit = currencyUnit,
             onTabSelected = { selectedType = it },
@@ -239,7 +251,6 @@ fun HomeScreen(
                             ExpenseListItem(
                                 group = group,
                                 selectedType = selectedType,
-                                typeSpendKey = typeSpendKey,
                                 currencyUnit = currencyUnit,
                                 countTemplate = transactionsCountTemplate,
                                 onClick = {
@@ -253,15 +264,14 @@ fun HomeScreen(
                                             "grouped_expense/${group.category.title}/$encodedAmount/$currentModeName/$currentStartTimestamp/$currentEndTimestamp"
                                         )
                                     } else {
-                                        val currentTypeEnum = if (selectedType == typeSpendKey) TransactionType.SPEND else TransactionType.INCOME
                                         val singleTransaction = expensesByPeriod.find {
-                                            it.category.id == group.category.id && it.type == currentTypeEnum
+                                            it.category.id == group.category.id && it.type == selectedType
                                         }
                                         val docId = singleTransaction?.firestoreDocId ?: ""
                                         if (docId.isNotEmpty()) {
                                             navController.navigate("detail_expense/$docId")
                                         } else {
-                                            android.util.Log.e("HomeScreen", "Không tìm thấy mã chuỗi firestoreDocId!")
+                                            android.util.Log.e("HomeScreen", "Missing firestoreDocId")
                                         }
                                     }
                                 }
@@ -284,13 +294,13 @@ fun HomeScreen(
                 else navController.navigate(Screen.Login.route)
             },
             modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-            containerColor = MaterialTheme.colorScheme.secondaryContainer, // ✅ Sử dụng màu Container của hệ thống
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
             shape = CircleShape
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = stringResource(StringRes.add_btn_desc), // ✅ Sửa lỗi compile nhãn id =
-                tint = MaterialTheme.colorScheme.onSecondaryContainer // ✅ Đồng bộ màu Icon theo hệ thống
+                contentDescription = stringResource(StringRes.add_btn_desc),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
     }
@@ -298,12 +308,12 @@ fun HomeScreen(
 
 @Composable
 fun HeaderSection(
-    selectedType: String,
-    typeSpendKey: String,
-    typeIncomeKey: String,
+    selectedType: TransactionType,
+    typeSpendLabel: String,
+    typeIncomeLabel: String,
     totalBalance: Double,
     currencyUnit: String,
-    onTabSelected: (String) -> Unit,
+    onTabSelected: (TransactionType) -> Unit,
     onMenuClick: () -> Unit
 ) {
     val balanceFormatter = remember {
@@ -315,19 +325,47 @@ fun HeaderSection(
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp)) {
         IconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.Menu, null, tint = MaterialTheme.colorScheme.onPrimary) // ✅ Đổi sang màu chữ trên nền Primary
+            Icon(Icons.Default.Menu, null, tint = Color.White)
         }
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = stringResource(StringRes.total_balance), color = MaterialTheme.colorScheme.onPrimary.copy(0.6f), fontSize = 11.sp) // ✅ Sửa lỗi nhãn id =
-            Text(text = "$formattedBalance $currencyUnit", color = MaterialTheme.colorScheme.onPrimary, fontSize = 36.sp, fontWeight = FontWeight.Black)
+            Text(text = stringResource(StringRes.total_balance), color = Color.White, fontSize = 11.sp)
+            Text(
+                text = "$formattedBalance $currencyUnit",
+                color = Color.White,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Black
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Row(Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.onPrimary.copy(0.1f)).padding(4.dp)) {
-            listOf(typeSpendKey, typeIncomeKey).forEach { title ->
-                val isSelected = selectedType == title
-                Box(Modifier.clip(RoundedCornerShape(12.dp)).background(if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(0.2f) else Color.Transparent).clickable { onTabSelected(title) }.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                    Text(text = title, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Row(
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.onPrimary.copy(0.1f))
+                .padding(4.dp)
+        ) {
+            listOf(
+                TransactionType.SPEND to typeSpendLabel,
+                TransactionType.INCOME to typeIncomeLabel
+            ).forEach { (type, title) ->
+                val isSelected = selectedType == type
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(0.2f)
+                            else Color.Transparent
+                        )
+                        .clickable { onTabSelected(type) }
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -343,7 +381,9 @@ fun TimeNavigationHeader(viewModel: HistoryViewModel, themeColor: Color, onCusto
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .clickable { if (mode == CalendarMode.CUSTOM) onCustomRangeClick() else viewModel.changeMode(mode) }
+                        .clickable {
+                            if (mode == CalendarMode.CUSTOM) onCustomRangeClick() else viewModel.changeMode(mode)
+                        }
                         .padding(vertical = 4.dp)
                 ) {
                     Text(
@@ -353,17 +393,23 @@ fun TimeNavigationHeader(viewModel: HistoryViewModel, themeColor: Color, onCusto
                             CalendarMode.MONTH -> stringResource(StringRes.month)
                             CalendarMode.YEAR -> stringResource(StringRes.year)
                             CalendarMode.CUSTOM -> stringResource(StringRes.period_custom_range)
-                        }, // ✅ Sửa lỗi compile nhãn id = ở tất cả các dòng
+                        },
                         color = if (isSelected) themeColor else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         fontSize = 14.sp
                     )
-                    if (isSelected) Box(Modifier.padding(top = 2.dp).size(16.dp, 2.dp).background(themeColor, CircleShape))
+                    if (isSelected) {
+                        Box(Modifier.padding(top = 2.dp).size(16.dp, 2.dp).background(themeColor, CircleShape))
+                    }
                 }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
             val isCustom = viewModel.calendarMode == CalendarMode.CUSTOM
             IconButton(onClick = { viewModel.movePrevious() }, enabled = !isCustom) {
                 Icon(
@@ -394,8 +440,7 @@ fun TimeNavigationHeader(viewModel: HistoryViewModel, themeColor: Color, onCusto
 @Composable
 fun ExpenseListItem(
     group: GroupedExpense,
-    selectedType: String,
-    typeSpendKey: String,
+    selectedType: TransactionType,
     currencyUnit: String,
     countTemplate: String,
     onClick: () -> Unit
@@ -416,14 +461,18 @@ fun ExpenseListItem(
         ExpenseItem(
             title = group.category.title,
             percent = formattedCount,
-            amount = "${if (selectedType == typeSpendKey) "-" else "+"} ${String.format("%,.0f", group.totalAmount)} $currencyUnit",
+            amount = "${if (selectedType == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", group.totalAmount)} $currencyUnit",
             color = Color(android.graphics.Color.parseColor(group.category.colorHex))
         )
     }
 }
 
 @Composable
-fun LoadingUI(color: Color) { Box(Modifier.fillMaxWidth().padding(50.dp), Alignment.Center) { CircularProgressIndicator(color = color) } }
+fun LoadingUI(color: Color) {
+    Box(Modifier.fillMaxWidth().padding(50.dp), Alignment.Center) {
+        CircularProgressIndicator(color = color)
+    }
+}
 
 @Composable
 fun EmptyStateSection() {
@@ -439,7 +488,7 @@ fun EmptyStateSection() {
             modifier = Modifier.size(48.dp)
         )
         Text(
-            text = stringResource(StringRes.no_transactions), // ✅ Sửa lỗi compile nhãn id =
+            text = stringResource(StringRes.no_transactions),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
         )

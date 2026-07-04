@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +37,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.example.moneymate.StringRes
 import com.example.moneymate.data.local.CategoryEntity
 import com.example.moneymate.ui.item.IconItem
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.ui.theme.stringResource
 import com.example.moneymate.ui.utils.IconUtils
 
@@ -87,7 +87,7 @@ fun AddCategoryScreen(
     }
 
     // Tự động tính toán màu chữ tương phản dựa trên màu nền của TopAppBar (Tránh chữ trắng trên nền vàng nhạt)
-    val appBarContentColor = contentColorFor(backgroundColor = themeColor)
+    val appBarContentColor = Color.White
 
     Scaffold(
         topBar = {
@@ -102,10 +102,10 @@ fun AddCategoryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null, tint = appBarContentColor)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = appBarContentColor)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColor) // ✅ Đồng bộ màu động theo danh mục
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppTopBarColor) // ✅ Đồng bộ màu động theo danh mục
             )
         }
     ) { padding ->
@@ -298,3 +298,4 @@ fun AddCategoryScreen(
         }
     }
 }
+

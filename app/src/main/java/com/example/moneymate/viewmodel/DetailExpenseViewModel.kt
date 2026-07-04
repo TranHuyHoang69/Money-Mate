@@ -43,10 +43,9 @@ class DetailExpenseViewModel @Inject constructor(
 
         viewModelScope.launch {
             // ✅ ĐÃ SỬA: Chỉ truyền chuỗi ID 'firestoreDocId' thay vì truyền cả Object 'expense'
-            repository.deleteExpense(expense.firestoreDocId)
-
-            // Bắn tín hiệu kết thúc qua hàng đợi an toàn để ép UI popBackStack lập tức
-            _eventChannel.trySend(Unit)
+            if (repository.deleteExpense(expense.firestoreDocId) is Result.Success) {
+                _eventChannel.trySend(Unit)
+            }
         }
     }
 }

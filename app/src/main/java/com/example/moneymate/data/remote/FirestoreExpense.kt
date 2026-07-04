@@ -6,6 +6,7 @@ data class FirestoreExpense(
     val type: String = "",
     val amount: Double = 0.0,
     val categoryId: Long = 0,
+    val categoryStableId: String = "",
     val categoryTitle: String = "",
     val categoryColorHex: String = "",
     val timestamp: Long = 0,

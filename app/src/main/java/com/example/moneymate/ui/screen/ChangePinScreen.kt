@@ -19,8 +19,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.StringRes       // ✅ Bộ quản lý ID tài nguyên chuỗi tập trung
 import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
 import com.example.moneymate.viewmodel.SecurityViewModel
@@ -151,13 +152,13 @@ fun ChangePinScreen(
                 title = { Text(text = stringResource(StringRes.change_pin), fontSize = 20.sp, fontWeight = FontWeight.Bold) }, // ✅ Sửa lỗi nhãn id =
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = stringResource(StringRes.back_btn)) // ✅ Sửa lỗi nhãn id =
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(StringRes.back_btn)) // ✅ Sửa lỗi nhãn id =
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer, // ✅ Chuyển màu động M3 thay vì hardcode mã HEX xanh
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = AppTopBarColor,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
                 )
             )
         },
@@ -239,7 +240,7 @@ fun ChangePinScreen(
                                             modifier = Modifier.size(70.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Backspace,
+                                                imageVector = Icons.AutoMirrored.Filled.Backspace,
                                                 contentDescription = stringResource(StringRes.back_btn), // ✅ Sửa lỗi nhãn id =
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(28.dp)

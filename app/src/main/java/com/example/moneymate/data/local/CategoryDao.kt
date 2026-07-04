@@ -21,8 +21,14 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE LOWER(title) = LOWER(:title) AND type = :type AND userId = :userId LIMIT 1")
     suspend fun getCategoryByNameAndType(title: String, type: String, userId: String): CategoryEntity?
 
+    @Query("SELECT * FROM categories WHERE stableId = :stableId AND (userId = :userId OR isDefault = 1) LIMIT 1")
+    suspend fun getCategoryByStableId(stableId: String, userId: String): CategoryEntity?
+
+    @Query("SELECT * FROM categories WHERE categoryId = :categoryId LIMIT 1")
+    suspend fun getCategoryById(categoryId: Long): CategoryEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategory(category: CategoryEntity)
+    suspend fun insertCategory(category: CategoryEntity): Long
 
     @Update
     suspend fun updateCategory(category: CategoryEntity)

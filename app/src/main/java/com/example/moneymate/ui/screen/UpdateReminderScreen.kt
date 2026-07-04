@@ -53,7 +53,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.moneymate.StringRes
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.ui.theme.stringResource
+import com.example.moneymate.util.ReminderRepeat
 import com.example.moneymate.viewmodel.ReminderViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -99,7 +101,8 @@ fun UpdateReminderScreen(
                 title = it.title
                 note = it.note
                 // Xác thực giá trị tần suất cũ có khớp trong tập danh sách ngôn ngữ mới hay không
-                repeatInterval = if (repeatOptions.contains(it.repeatInterval)) it.repeatInterval else (repeatOptions.getOrNull(0) ?: "")
+                val repeatIndex = ReminderRepeat.fromStored(it.repeatInterval).ordinal
+                repeatInterval = repeatOptions.getOrElse(repeatIndex) { repeatOptions.getOrNull(0) ?: "" }
 
                 val savedCalendar = Calendar.getInstance().apply {
                     timeInMillis = it.reminderDateTime
@@ -223,7 +226,7 @@ fun UpdateReminderScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFF006C4C),
+                        color = AppTopBarColor,
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     )
                     .padding(horizontal = 16.dp, vertical = 20.dp)

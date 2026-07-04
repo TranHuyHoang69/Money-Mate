@@ -16,7 +16,9 @@ import com.example.moneymate.domain.model.UserPreferences
 
 // GIAO DIỆN SÁNG
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF4CB080),          // Xanh lá thương hiệu (cho Button, FAB, các điểm nhấn)
+    primary = Color(0xFF4CB080),          //  Xanh lá thương hiệu (cho Button, FAB, các điểm nhấn)
+    primaryContainer = AppTopBarColor,
+    onPrimaryContainer = Color.White,
     background = Color(0xFFF6F6F6),       // Nền màn hình sáng (màu xám trắng dịu mắt hơn trắng tinh)
     surface = Color.White,                // Nền các thẻ Card sáng
     onBackground = Color(0xFF1C1B1F),     // Chữ đen trên nền sáng
@@ -26,7 +28,9 @@ private val LightColorScheme = lightColorScheme(
 
 // GIAO DIỆN TỐI (Bỏ biến ngoài, viết cứng mã màu trực tiếp)
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF4CB080),          // Giữ nguyên màu xanh lá thương hiệu
+    primary = Color(0xFF4CB080),          //  Giữ nguyên màu xanh lá thương hiệu
+    primaryContainer = AppTopBarColor,
+    onPrimaryContainer = Color.White,
     background = Color(0xFF262620),       // Nền tối xám trầm
     surface = Color(0xFF32322C),          // Nền Card tối
     onBackground = Color(0xFFFFFFFF),     // Chữ trắng trên nền tối

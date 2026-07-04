@@ -1,5 +1,6 @@
 package com.example.moneymate.ui.screen
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +42,8 @@ import com.example.moneymate.StringRes
 import com.example.moneymate.domain.Result
 import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.TransactionType
+import com.example.moneymate.ui.navigation.HomeNavKeys
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.ui.theme.stringResource // ✅ Sử dụng hàm dịch i18n custom chính xác
 import com.example.moneymate.viewmodel.AddExpenseEvent
 import com.example.moneymate.viewmodel.AddExpenseUiEvent
@@ -76,7 +79,15 @@ fun UpdateScreen(
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is AddExpenseUiEvent.SaveSuccess -> {
+                    event.timestamp?.let { savedTimestamp ->
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(HomeNavKeys.SAVED_TRANSACTION_DATE_MILLIS, savedTimestamp)
+                    }
                     navController.popBackStack()
+                }
+                is AddExpenseUiEvent.ShowError -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -107,8 +118,8 @@ fun UpdateScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         HeaderUpdate(
-            themeColor = themeColor,
-            contentColor = contentColorOnTheme,
+            themeColor = AppTopBarColor,
+            contentColor = Color.White,
             selectedType = state.selectedType,
             onTabSelected = { viewModel.onEvent(AddExpenseEvent.ChangeType(it)) },
             onBack = { navController.popBackStack() },
@@ -135,6 +146,7 @@ fun UpdateScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 AmountInputField(
                     amount = state.amount,
+                    amountError = state.amountError,
                     themeColor = themeColor,
                     onAmountChange = { viewModel.onEvent(AddExpenseEvent.ChangeAmount(it)) }
                 )
@@ -192,7 +204,7 @@ fun UpdateScreen(
                         containerColor = themeColor,
                         contentColor = contentColorOnTheme
                     ),
-                    enabled = state.amount.isNotBlank() && state.selectedCategory != null
+                    enabled = state.isAmountValid && state.selectedCategory != null
                 ) {
                     Text(
                         text = confirmActionText, // ✅ Dùng biến chuỗi thuần thay vì gọi hàm Composable ở đây
@@ -228,7 +240,7 @@ fun HeaderUpdate(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = Icons.Default.ArrowBack,
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = backBtnDescText,
                 tint = contentColor,
                 modifier = Modifier.size(28.dp).clickable { onBack() }

@@ -2,6 +2,8 @@ package com.example.moneymate.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+val AppTopBarColor = Color(0xFF006C4C)
+
 val GreenBackground = Color(0xFF388E3C) // Màu nền chính
 val TealBackground = Color(0xFF00796B)  // Màu Header
 val PinkColor = Color(0xFFE91E63)        // Màu biểu đồ 1

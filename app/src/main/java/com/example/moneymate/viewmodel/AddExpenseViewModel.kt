@@ -10,12 +10,15 @@ import com.example.moneymate.domain.model.Category
 import com.example.moneymate.domain.model.Expense
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.domain.usecase.ExpenseUseCases
+import com.example.moneymate.domain.usecase.expense.ExpenseAmountValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.Locale
 import javax.inject.Inject
 
 // --- UI STATE ---
@@ -26,8 +29,12 @@ data class AddExpenseUiState(
     val selectedCategory: Category? = null,
     val selectedDate: Long = System.currentTimeMillis(),
     val categories: Result<List<Category>> = Result.Loading,
-    val currentFirestoreDocId: String = ""
-)
+    val currentFirestoreDocId: String = "",
+    val amountError: String? = null
+) {
+    val isAmountValid: Boolean
+        get() = ExpenseAmountValidator.parseValidAmount(amount) != null
+}
 
 // --- EVENTS ---
 sealed class AddExpenseEvent {
@@ -37,6 +44,12 @@ sealed class AddExpenseEvent {
     data class ChangeType(val type: TransactionType) : AddExpenseEvent()
     data class SelectCategory(val category: Category) : AddExpenseEvent()
     data class ChangeDate(val timestamp: Long) : AddExpenseEvent()
+    data class ApplyReceiptScanResult(
+        val amount: String?,
+        val dateMillis: Long?,
+        val note: String?,
+        val categoryTitle: String?
+    ) : AddExpenseEvent()
     data class LoadDetails(val expenseId: Long) : AddExpenseEvent()
     object Save : AddExpenseEvent()
     object Delete : AddExpenseEvent() // ✅ ĐÃ THÊM: Event phục vụ cho nút Xóa
@@ -44,7 +57,8 @@ sealed class AddExpenseEvent {
 
 // --- UI SIDE EFFECTS ---
 sealed class AddExpenseUiEvent {
-    object SaveSuccess : AddExpenseUiEvent()
+    data class SaveSuccess(val timestamp: Long? = null) : AddExpenseUiEvent()
+    data class ShowError(val message: String) : AddExpenseUiEvent()
 }
 
 @HiltViewModel
@@ -68,9 +82,12 @@ class AddExpenseViewModel @Inject constructor(
                 loadExpenseDetailsByFirestoreId(event.id)
             }
             is AddExpenseEvent.ChangeAmount -> {
-                if (event.amount.all { it.isDigit() || it == '.' } && event.amount.count { it == '.' } <= 1) {
-                    uiState = uiState.copy(amount = event.amount)
-                }
+                uiState = uiState.copy(
+                    amount = event.amount,
+                    amountError = event.amount
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { ExpenseAmountValidator.errorOrNull(it) }
+                )
             }
             is AddExpenseEvent.ChangeNote -> {
                 uiState = uiState.copy(note = event.note)
@@ -89,6 +106,9 @@ class AddExpenseViewModel @Inject constructor(
             }
             is AddExpenseEvent.ChangeDate -> {
                 uiState = uiState.copy(selectedDate = event.timestamp)
+            }
+            is AddExpenseEvent.ApplyReceiptScanResult -> {
+                applyReceiptScanResult(event)
             }
             is AddExpenseEvent.LoadDetails -> {
                 loadExpenseDetails(event.expenseId)
@@ -113,6 +133,39 @@ class AddExpenseViewModel @Inject constructor(
                     }
                 }
             }.launchIn(viewModelScope)
+    }
+
+    private fun applyReceiptScanResult(event: AddExpenseEvent.ApplyReceiptScanResult) {
+        val matchedCategory = event.categoryTitle
+            ?.takeIf { it.isNotBlank() }
+            ?.let { targetTitle ->
+                (uiState.categories as? Result.Success)
+                    ?.data
+                    ?.firstOrNull { category ->
+                        normalizeCategoryTitle(category.title) == normalizeCategoryTitle(targetTitle)
+                    }
+            }
+
+        val nextAmount = event.amount?.takeIf { it.isNotBlank() } ?: uiState.amount
+
+        uiState = uiState.copy(
+            amount = nextAmount,
+            amountError = nextAmount
+                .takeIf { it.isNotEmpty() }
+                ?.let { ExpenseAmountValidator.errorOrNull(it) },
+            note = event.note?.takeIf { it.isNotBlank() } ?: uiState.note,
+            selectedDate = event.dateMillis ?: uiState.selectedDate,
+            selectedCategory = matchedCategory ?: uiState.selectedCategory
+        )
+    }
+
+    private fun normalizeCategoryTitle(value: String): String {
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace("\\p{Mn}+".toRegex(), "")
+            .lowercase(Locale.ROOT)
+            .replace('đ', 'd')
+            .replace("\\s+".toRegex(), " ")
+            .trim()
     }
 
     private fun loadExpenseDetailsByFirestoreId(id: String) {
@@ -159,7 +212,12 @@ class AddExpenseViewModel @Inject constructor(
     }
 
     private fun saveExpense() {
-        val amountDouble = uiState.amount.toDoubleOrNull() ?: 0.0
+        val amountDouble = ExpenseAmountValidator.parseValidAmount(uiState.amount)
+        if (amountDouble == null) {
+            uiState = uiState.copy(amountError = ExpenseAmountValidator.ERROR_MESSAGE)
+            return
+        }
+
         val category = uiState.selectedCategory ?: return
 
         val expense = Expense(
@@ -174,15 +232,17 @@ class AddExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // ✅ Được bọc try-catch phòng trường hợp mạng lỗi hoặc Firestore từ chối ghi tài liệu
-                if (uiState.currentFirestoreDocId.isEmpty()) {
+                val result = if (uiState.currentFirestoreDocId.isEmpty()) {
                     useCases.addExpense(expense)
                 } else {
                     useCases.updateExpense(expense)
                 }
                 // Phát tín hiệu đóng màn hình về UI lập tức
-                _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess)
+                handleExpenseResult(result) {
+                    _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess(expense.timestamp))
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                sendError(e.message)
             }
         }
     }
@@ -195,12 +255,34 @@ class AddExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Gọi xuống UseCase xóa trên Firestore
-                useCases.deleteExpense(currentId)
+                val result = useCases.deleteExpense(currentId)
                 // Phát tín hiệu đóng màn hình về UI lập tức sau khi xóa thành công
-                _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess)
+                handleExpenseResult(result) {
+                    _eventChannel.trySend(AddExpenseUiEvent.SaveSuccess())
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                sendError(e.message)
             }
         }
+    }
+
+    private fun handleExpenseResult(result: Result<Unit>, onSuccess: () -> Unit) {
+        when (result) {
+            is Result.Success -> onSuccess()
+            is Result.Error -> sendError(result.message)
+            Result.Loading -> sendError(null)
+        }
+    }
+
+    private fun sendError(message: String?) {
+        _eventChannel.trySend(
+            AddExpenseUiEvent.ShowError(
+                message?.takeIf { it.isNotBlank() } ?: DEFAULT_ERROR_MESSAGE
+            )
+        )
+    }
+
+    private companion object {
+        const val DEFAULT_ERROR_MESSAGE = "Không thể hoàn tất thao tác. Vui lòng thử lại."
     }
 }

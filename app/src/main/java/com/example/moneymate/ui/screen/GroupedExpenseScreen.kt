@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,8 +52,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.moneymate.StringRes       // ✅ Bộ quản lý ID tài nguyên chuỗi tập trung
 import com.example.moneymate.domain.model.Expense
+import com.example.moneymate.domain.model.ExpenseSyncStatus
 import com.example.moneymate.domain.model.TransactionType
 import com.example.moneymate.ui.item.ExpenseItem
+import com.example.moneymate.ui.theme.AppTopBarColor
 import com.example.moneymate.ui.theme.stringResource // ✅ Đã sửa sang import hàm dịch i18n custom sạch crash
 import com.example.moneymate.viewmodel.HistoryViewModel
 import com.example.moneymate.viewmodel.SortType
@@ -140,12 +142,12 @@ fun GroupedExpenseScreen(
                             text = categoryName,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface // ✅ Sửa màu Text theo hệ thống thích ứng Dark Mode
+                            color = Color.White // ✅ Sửa màu Text theo hệ thống thích ứng Dark Mode
                         )
                         Text(
                             text = "${stringResource(StringRes.total_prefix)} ${String.format("%,.0f", totalAmount)} $currencyUnit", // ✅ Sửa lỗi compile nhãn id =
                             fontSize = 14.sp,
-                            color = themeColor,
+                            color = Color.White.copy(alpha = 0.85f),
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -153,13 +155,13 @@ fun GroupedExpenseScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(StringRes.back_btn), // ✅ Sửa lỗi compile nhãn id =
-                            tint = MaterialTheme.colorScheme.onSurface // ✅ Sửa màu Icon theo hệ thống thích ứng Dark Mode
+                            tint = Color.White // ✅ Sửa màu Icon theo hệ thống thích ứng Dark Mode
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface) // ✅ Đổi màu nền thanh công cụ thích ứng hệ thống
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppTopBarColor) // ✅ Đổi màu nền thanh công cụ thích ứng hệ thống
             )
         }
     ) { padding ->
@@ -292,7 +294,8 @@ fun GroupedExpenseScreen(
                                                 title = expense.category.title,
                                                 percent = formattedTime,
                                                 amount = "${if (expense.type == TransactionType.SPEND) "-" else "+"} ${String.format("%,.0f", expense.amount)} $currencyUnit",
-                                                color = Color(android.graphics.Color.parseColor(expense.category.colorHex))
+                                                color = Color(android.graphics.Color.parseColor(expense.category.colorHex)),
+                                                syncStatusLabel = expense.syncStatusLabel()
                                             )
                                         }
 
@@ -313,3 +316,12 @@ fun GroupedExpenseScreen(
         }
     }
 }
+
+private fun Expense.syncStatusLabel(): String? {
+    return when {
+        lastSyncError != null -> "Đồng bộ lỗi"
+        syncStatus != ExpenseSyncStatus.SYNCED -> "Chờ đồng bộ"
+        else -> null
+    }
+}
+
