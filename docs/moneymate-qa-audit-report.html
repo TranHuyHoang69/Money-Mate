@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MoneyMate - Báo cáo QA Audit</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #18202a;
+      --muted: #5d6b7a;
+      --line: #dce3ea;
+      --primary: #236b4b;
+      --danger: #b42318;
+      --warn: #b54708;
+      --info: #175cd3;
+      --ok: #027a48;
+      --code: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      background: #133326;
+      color: #fff;
+      padding: 28px 32px;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    header p {
+      margin: 0;
+      color: #d8efe4;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 18px;
+      padding: 20px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      color: var(--primary);
+      font-size: 20px;
+    }
+
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 16px;
+    }
+
+    p { margin: 0 0 10px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    th {
+      background: #eef4f0;
+      color: #153f2d;
+      text-align: left;
+      font-weight: 700;
+    }
+
+    code {
+      background: var(--code);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .meta div {
+      background: #eef4f0;
+      border: 1px solid #cfe0d8;
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .critical, .high { background: #fee4e2; color: var(--danger); }
+    .medium { background: #fef0c7; color: var(--warn); }
+    .low { background: #e0f2fe; color: var(--info); }
+    .pass { background: #dcfae6; color: var(--ok); }
+    .fail { background: #fee4e2; color: var(--danger); }
+    .manual { background: #e0e7ff; color: #3538cd; }
+    .risk { color: var(--danger); font-weight: 700; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MoneyMate - Báo cáo QA/Test Audit</h1>
+    <p>Senior Android Developer & QA/Test Engineer review. Trang này được cập nhật theo mục tiêu offline-first: app dùng được khi mất mạng và đồng bộ Firebase khi có mạng trở lại.</p>
+    <div class="meta">
+      <div><strong>Ngày thực hiện:</strong><br>30/06/2026</div>
+      <div><strong>Dự án:</strong><br><code>C:\Users\Admin\AndroidStudioProjects\MoneyMate</code></div>
+      <div><strong>Module chính:</strong><br><code>MoneyMate.app.main</code>, <code>unitTest</code>, <code>androidTest</code></div>
+      <div><strong>Trạng thái:</strong><br>Build pass, unit test pass, lint pass sau các fix đã thực hiện</div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Tóm Tắt Điều Hành</h2>
+      <table>
+        <thead>
+          <tr><th>Hạng mục</th><th>Kết quả</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>testDebugUnitTest</code></td><td><span class="badge pass">Pass</span></td><td>Đã chạy lại sau các fix BUG-001, BUG-002, BUG-003, BUG-010.</td></tr>
+          <tr><td><code>assembleDebug</code></td><td><span class="badge pass">Pass</span></td><td>APK debug build thành công.</td></tr>
+          <tr><td><code>lintDebug</code></td><td><span class="badge pass">Pass</span></td><td>Không còn fail vì BUG-010; vẫn còn warnings cần xử lý sau.</td></tr>
+          <tr><td><code>androidTest</code></td><td><span class="badge manual">Need manual</span></td><td>Chưa chạy vì cần emulator/device.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Công nghệ xác định từ code</h3>
+      <table>
+        <tbody>
+          <tr><th>Ngôn ngữ/UI</th><td>Kotlin, Jetpack Compose, Material 3</td></tr>
+          <tr><th>DI</th><td>Hilt</td></tr>
+          <tr><th>Local storage</th><td>Room, DataStore Preferences</td></tr>
+          <tr><th>Backend/Auth</th><td>Firebase Auth, Firestore, Google Sign-In</td></tr>
+          <tr><th>OCR/AI</th><td>ML Kit Text Recognition, Gemini REST API qua <code>HttpURLConnection</code></td></tr>
+          <tr><th>Navigation</th><td>Navigation Compose</td></tr>
+          <tr><th>Charts</th><td>Vico</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Định hướng offline-first cần áp dụng</h3>
+      <table>
+        <tbody>
+          <tr><th>Mục tiêu sản phẩm</th><td>Người dùng có thể thêm/sửa/xóa giao dịch khi mất mạng; dữ liệu hiển thị ngay trong app và được đồng bộ lên Firebase khi có mạng.</td></tr>
+          <tr><th>Đánh giá hiện tại</th><td>App đang trộn Firestore offline cache với Room backup. Với user đã đăng nhập, Home đọc từ Firestore listener, chưa lấy Room làm source of truth nên chưa phải offline-first chủ động.</td></tr>
+          <tr><th>Khoảng thiếu chính</th><td>Chưa có sync state cho giao dịch, chưa có pending sync queue, chưa có retry/background sync rõ ràng, chưa có xử lý pending delete/update và conflict đa thiết bị.</td></tr>
+          <tr><th>Hướng sửa đúng</th><td>Room nên là nguồn dữ liệu chính cho UI; Firebase là tầng đồng bộ. Mỗi thay đổi local cần có trạng thái <code>PENDING_CREATE</code>, <code>PENDING_UPDATE</code>, <code>PENDING_DELETE</code>, <code>SYNCED</code> hoặc <code>FAILED</code>.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>2. Bảng Tổng Hợp Chức Năng</h2>
+      <table>
+        <thead>
+          <tr><th>Chức năng</th><th>File/class liên quan</th><th>Luồng xử lý</th><th>Đánh giá ổn định</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Đăng nhập/đăng ký</td>
+            <td><code>ui/screen/LoginScreen.kt</code>, <code>RegisterScreen.kt</code>, <code>viewmodel/AuthViewModel.kt</code>, <code>data/repository/AuthRepositoryImpl.kt</code></td>
+            <td>UI nhập email/password hoặc Google -> ViewModel validate -> Firebase Auth -> navigate.</td>
+            <td>Khá ổn. Cần test Google login trên thiết bị thực.</td>
+          </tr>
+          <tr>
+            <td>Quản lý giao dịch thu/chi</td>
+            <td><code>AddScreen.kt</code>, <code>UpdateScreen.kt</code>, <code>DetailExpenseScreen.kt</code>, <code>AddExpenseViewModel.kt</code>, <code>ExpenseRepositoryImpl.kt</code></td>
+            <td>UI -> ViewModel -> UseCase -> Firestore + Room backup. Với user đã đăng nhập, Home đang đọc Firestore listener thay vì Room source of truth.</td>
+            <td><span class="risk">Rủi ro cao</span>: cần chuyển sang local-first/pending sync để dùng offline ổn định.</td>
+          </tr>
+          <tr>
+            <td>Danh mục</td>
+            <td><code>CategoryViewModel.kt</code>, <code>CategoryDao.kt</code>, <code>AddCategoryScreen.kt</code>, <code>CategoryManagementScreen.kt</code></td>
+            <td>UI tạo/chọn danh mục -> Room -> sync Firestore.</td>
+            <td><span class="risk">Rủi ro cao</span>: ID danh mục không ổn định, xóa category đang có giao dịch.</td>
+          </tr>
+          <tr>
+            <td>Home, lịch sử, lọc</td>
+            <td><code>HomeScreen.kt</code>, <code>HomeViewModel.kt</code>, <code>HistoryViewModel.kt</code>, <code>DetailListScreen.kt</code></td>
+            <td>Firestore stream -> filter/sort/group -> Compose UI.</td>
+            <td>Trung bình. Một số logic dựa vào chuỗi hiển thị.</td>
+          </tr>
+          <tr>
+            <td>Thống kê/biểu đồ</td>
+            <td><code>StatisticViewModel.kt</code>, <code>StatisticScreen.kt</code>, <code>StatisticTab.kt</code></td>
+            <td>Query theo thời gian -> sum/group category -> chart/list.</td>
+            <td>Trung bình. Cần đối chiếu số liệu với dataset mẫu.</td>
+          </tr>
+          <tr>
+            <td>Ngân sách</td>
+            <td><code>BudgetViewModel.kt</code>, <code>BudgetRepositoryImpl.kt</code>, <code>BudgetScreen.kt</code></td>
+            <td>Room budget + Firestore budget + expense period -> progress + notification.</td>
+            <td><span class="risk">Rủi ro cao</span>: phụ thuộc categoryId local.</td>
+          </tr>
+          <tr>
+            <td>Giao dịch định kỳ</td>
+            <td><code>RecurringTransactionViewModel.kt</code>, <code>RecurringTransactionRepositoryImpl.kt</code>, <code>RecurringTransactionSchedule.kt</code></td>
+            <td>Lưu rule -> process due -> sinh expense -> cập nhật next run.</td>
+            <td>Khá ổn. Có unit test schedule.</td>
+          </tr>
+          <tr>
+            <td>Nhắc nhở</td>
+            <td><code>ReminderViewModel.kt</code>, <code>ReminderRepositoryImpl.kt</code>, <code>AlarmScheduler.kt</code>, <code>BootReceiver.kt</code></td>
+            <td>Room -> AlarmManager -> BroadcastReceiver -> notification.</td>
+            <td><span class="risk">Rủi ro cao</span>: restore sau reboot đang đọc sai DB.</td>
+          </tr>
+          <tr>
+            <td>OCR hóa đơn</td>
+            <td><code>ReceiptScanScreen.kt</code>, <code>ReceiptScanViewModel.kt</code>, <code>ReceiptOcrProcessor.kt</code>, <code>ReceiptTextParser.kt</code>, <code>GeminiCategorySuggestionService.kt</code></td>
+            <td>Camera/gallery -> ML Kit -> parser -> Gemini optional -> trả result về AddScreen.</td>
+            <td>Khá ổn. Parser có unit test, cần test ảnh thực tế.</td>
+          </tr>
+          <tr>
+            <td>PIN/biometric</td>
+            <td><code>SecurityScreen.kt</code>, <code>AuthLockScreen.kt</code>, <code>SecurityRepositoryImpl.kt</code>, <code>SecurityLocalDataSource.kt</code></td>
+            <td>PIN hash DataStore -> lock screen -> verify -> optional biometric.</td>
+            <td>Có rủi ro bảo mật và thiết bị không hỗ trợ biometric.</td>
+          </tr>
+          <tr>
+            <td>Tùy chỉnh theme/ngôn ngữ</td>
+            <td><code>CustomizationScreen.kt</code>, <code>CustomizationViewModel.kt</code>, <code>PreferencesLocalDataSource.kt</code></td>
+            <td>DataStore/Firestore -> CompositionLocal/theme/localization.</td>
+            <td>Trung bình. Lint cảnh báo dynamic locale.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Bug Report</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Mô tả lỗi</th><th>File/dòng liên quan</th><th>Tái hiện</th><th>Severity</th><th>Đề xuất sửa</th><th>Retest</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BUG-001</td>
+            <td><code>BootReceiver</code> mở DB tên <code>moneymate_database</code>, trong khi Hilt dùng <code>expense-db</code>. Reminder không restore sau reboot.</td>
+            <td><code>receiver/BootReceiver.kt:23</code>, <code>di/DatabaseModule.kt:32</code>, <code>data/local/AppDatabase.kt:143</code></td>
+            <td>Tạo reminder active -> reboot -> app không nạp lại alarm từ DB chính.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Thống nhất DB name hoặc dùng Hilt EntryPoint trong receiver để lấy đúng <code>AppDatabase</code>.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-002</td>
+            <td>Nhập amount <code>.</code> hoặc <code>0</code> vẫn có thể lưu thành <code>0.0</code>.</td>
+            <td><code>AddExpenseViewModel.kt:79</code>, <code>AddExpenseViewModel.kt:200</code>, <code>AddScreen.kt:377</code></td>
+            <td>Mở Add -> nhập <code>.</code> -> chọn category -> Save.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Validate <code>amount.toDoubleOrNull() != null && amount &gt; 0</code>, show error form.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-003</td>
+            <td>Ở mô hình remote-first, save/delete từng emit success dù repository có thể trả <code>Result.Error</code>. Nếu chuyển sang offline-first, cần phân biệt lỗi mạng với lỗi thật và emit trạng thái pending sync thay vì success giả.</td>
+            <td><code>AddExpenseViewModel.kt:213-222</code>, <code>AddExpenseViewModel.kt:234-239</code></td>
+            <td>Mất mạng, Firestore pending write hoặc Firestore reject khi save/delete.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Đã xử lý phần ViewModel theo remote-first: chỉ success khi <code>Result.Success</code>. Khi thiết kế offline-first, cần mở rộng để local save success thì navigate với trạng thái chờ đồng bộ, còn auth/permission/validation error vẫn phải báo lỗi.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-004</td>
+            <td>Thiết kế sync giao dịch chưa đạt offline-first: update/delete có thể bỏ qua lỗi Firestore, UI không có trạng thái pending sync, local Room và cloud có thể lệch.</td>
+            <td><code>ExpenseRepositoryImpl.kt:141-150</code>, <code>ExpenseRepositoryImpl.kt:155-167</code></td>
+            <td>Thêm/sửa/xóa giao dịch khi mất mạng rồi mở lại app, bật mạng hoặc dùng thiết bị khác để đối chiếu Firebase.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Thiết kế lại expense repository theo local-first: Room là source of truth, thêm sync state/pending operation, background retry lên Firebase, xử lý pending delete/update và conflict.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-005</td>
+            <td>Migration chỉ có 9->13. User có DB version 1-8 có thể crash khi upgrade.</td>
+            <td><code>data/local/AppDatabase.kt:38-139</code></td>
+            <td>Nâng cấp app từ schema cũ hơn version 9.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Thêm migration đầy đủ hoặc fallback destructive có cảnh báo/backup.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-006</td>
+            <td>Default categories sync lên Firestore với <code>categoryId = 0</code>; budget/expense dựa vào categoryId nên dễ sai sau reinstall/multi-device.</td>
+            <td><code>CategoryViewModel.kt:178-193</code>, <code>FireStoreDataSource.kt:186-202</code></td>
+            <td>Login thiết bị mới -> sync category -> tạo budget/expense -> số categoryId thay đổi.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Dùng stable category UUID/docId, không dùng Room autogen ID làm khóa sync.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-007</td>
+            <td>Xóa category đang có expense có thể lỗi FK/NOT NULL hoặc mất liên kết category.</td>
+            <td><code>ExpenseEntity.kt:10-16</code>, <code>CategoryViewModel.kt:111-119</code></td>
+            <td>Tạo expense với category custom -> xóa category đó.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Chặn xóa category đang được dùng hoặc reassign sang category mặc định hợp lệ.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-008</td>
+            <td>PIN 4 số hash SHA-256 không salt, lưu local và remote; nếu lộ hash dễ brute force.</td>
+            <td><code>SecurityLocalDataSource.kt:42-47</code>, <code>SecurityRepositoryImpl.kt:34-39</code></td>
+            <td>Thiết lập PIN, xem data local/remote.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Dùng Android Keystore/BiometricPrompt credential, salt + KDF, không sync PIN hash lên Firestore.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-009</td>
+            <td>Gemini API key được đóng vào <code>BuildConfig</code>; <code>local.properties</code> đang có key.</td>
+            <td><code>app/build.gradle.kts:34-42</code>, <code>GeminiCategorySuggestionService.kt:24</code></td>
+            <td>Build APK release/debug có key trong binary.</td>
+            <td><span class="badge high">High</span></td>
+            <td>Proxy qua backend/Cloud Function, restrict key, không nhúng key trong APK.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-010</td>
+            <td><code>lintDebug</code> fail: thiếu plural <code>one</code> tiếng Anh và thiếu <code>uses-feature camera required=false</code>.</td>
+            <td><code>values-en/strings.xml:210</code>, <code>AndroidManifest.xml:10</code></td>
+            <td>Chạy <code>gradlew lintDebug</code>.</td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>Bổ sung plural <code>one</code>; khai báo camera feature optional.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-011</td>
+            <td>Biometric không check khả năng hỗ trợ, có cast context trực tiếp.</td>
+            <td><code>SecurityScreen.kt:205-221</code>, <code>AuthLockScreen.kt:67-92</code></td>
+            <td>Máy không biometric/chưa enroll biometric.</td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>Dùng <code>BiometricManager.canAuthenticate()</code>, fallback PIN, cast Activity an toàn.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-012</td>
+            <td>Một số logic dựa vào chuỗi hiển thị như <code>CHI PHI</code>, <code>Ngay</code>; dễ sai khi đổi ngôn ngữ/encoding.</td>
+            <td><code>HomeViewModel.kt:43</code>, <code>HomeViewModel.kt:110</code>, <code>HomeViewModel.kt:168</code></td>
+            <td>Đổi ngôn ngữ app rồi lọc/vẽ chart.</td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>Dùng enum/state nội bộ, UI mới map sang string.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-013</td>
+            <td><code>clearAllTables()</code> khi logout/account switch xóa toàn bộ bảng local, gồm cả dữ liệu system/default/learning nếu có.</td>
+            <td><code>LocalDataCleaner.kt:16-29</code>, <code>AuthViewModel.kt:55-57</code>, <code>AuthViewModel.kt:130-135</code></td>
+            <td>Logout/login user khác, quan sát local DB và categories.</td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>Xóa theo <code>userId</code>, giữ dữ liệu default/system nếu cần.</td>
+            <td>Có</td>
+          </tr>
+          <tr>
+            <td>BUG-014</td>
+            <td>Reminder lặp lưu chuỗi đã localize; thêm ngôn ngữ mới có thể parse về <code>ONCE</code>.</td>
+            <td><code>AddReminderScreen.kt:389-397</code>, <code>ReminderRepeat.kt:62-97</code></td>
+            <td>Tạo reminder bằng ngôn ngữ mới chưa map trong parser.</td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>Lưu enum key cố định, UI chỉ hiện localized label.</td>
+            <td>Có</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Test Case Checklist</h2>
+      <table>
+        <thead>
+          <tr><th>TC</th><th>Chức năng</th><th>Điều kiện/bước test</th><th>Kết quả mong đợi</th><th>Kết quả từ code</th><th>Status</th><th>Severity nếu lỗi</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>TC-01</td><td>Build</td><td>Chạy <code>assembleDebug</code></td><td>Build APK thành công</td><td>Pass</td><td><span class="badge pass">Pass</span></td><td>-</td></tr>
+          <tr><td>TC-02</td><td>Unit test</td><td>Chạy <code>testDebugUnitTest</code></td><td>0 fail</td><td>57 pass</td><td><span class="badge pass">Pass</span></td><td>-</td></tr>
+          <tr><td>TC-03</td><td>Lint</td><td>Chạy <code>lintDebug</code></td><td>0 error</td><td>2 errors</td><td><span class="badge fail">Fail</span></td><td>Medium</td></tr>
+          <tr><td>TC-04</td><td>Login email</td><td>Email/password hợp lệ</td><td>Login và vào Home</td><td>Có validate + Firebase</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-05</td><td>Login input sai</td><td>Email rỗng/sai format/password rỗng</td><td>Hiện lỗi, không gọi Firebase</td><td>Có validate</td><td><span class="badge pass">Pass code</span></td><td>Medium</td></tr>
+          <tr><td>TC-06</td><td>Google login</td><td>Cancel, mất mạng, OAuth config sai</td><td>Hiện lỗi rõ ràng</td><td>Có xử lý một số status</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-07</td><td>Add transaction online</td><td>Amount 100000, category, date, có mạng</td><td>Lưu local, sync Firebase, UI hiển thị đúng</td><td>Có luồng lưu; cần đối chiếu Firebase console</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-08</td><td>Add invalid amount</td><td>Nhập <code>.</code> hoặc <code>0</code></td><td>Không cho lưu, báo lỗi số tiền</td><td>Đã bổ sung validate ở ViewModel/usecase</td><td><span class="badge pass">Pass code</span></td><td>High</td></tr>
+          <tr><td>TC-09</td><td>Offline add/update/delete transaction</td><td>Mất mạng, thêm/sửa/xóa giao dịch rồi bật mạng lại</td><td>Thao tác local thành công, UI có trạng thái chờ đồng bộ, khi có mạng Firebase nhận đúng thay đổi</td><td>Chưa có sync state/pending queue rõ ràng; đang phụ thuộc Firestore cache + Room backup</td><td><span class="badge fail">Fail risk</span></td><td>High</td></tr>
+          <tr><td>TC-10</td><td>Category duplicate</td><td>Tạo trùng tên/type</td><td>Không tạo trùng</td><td>Có check local name/type</td><td><span class="badge manual">Need manual</span></td><td>Medium</td></tr>
+          <tr><td>TC-11</td><td>Delete used category</td><td>Category có expense</td><td>Không crash/mất liên kết</td><td>Có rủi ro FK</td><td><span class="badge fail">Fail risk</span></td><td>High</td></tr>
+          <tr><td>TC-12</td><td>History filter</td><td>Day/week/month/year/custom</td><td>Đúng khoảng ngày</td><td>Logic có</td><td><span class="badge manual">Need manual</span></td><td>Medium</td></tr>
+          <tr><td>TC-13</td><td>Statistics</td><td>Dataset mẫu income/expense</td><td>Tổng và % đúng</td><td>Logic group/sum có</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-14</td><td>Budget</td><td>Set budget, chi vượt hạn mức</td><td>Progress + notification</td><td>Có logic, cần permission</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-15</td><td>Recurring transaction</td><td>Rule quá hạn nhiều kỳ</td><td>Sinh expense tối đa 24 catch-up</td><td>Có unit test</td><td><span class="badge pass">Pass code</span></td><td>Medium</td></tr>
+          <tr><td>TC-16</td><td>Reminder reboot</td><td>Tạo reminder active, reboot</td><td>Alarm được restore</td><td>DB name sai</td><td><span class="badge fail">Fail</span></td><td>High</td></tr>
+          <tr><td>TC-17</td><td>OCR hóa đơn</td><td>Ảnh rõ/mờ/dài</td><td>Parse amount/date/category hoặc cảnh báo</td><td>Parser có test</td><td><span class="badge manual">Need manual</span></td><td>Medium</td></tr>
+          <tr><td>TC-18</td><td>Camera permission</td><td>Từ chối camera</td><td>Không crash, báo lỗi</td><td>Có báo lỗi</td><td><span class="badge manual">Need manual</span></td><td>Low</td></tr>
+          <tr><td>TC-19</td><td>PIN</td><td>Nhập PIN sai/đúng</td><td>Sai reset, đúng vào app</td><td>Có xử lý</td><td><span class="badge manual">Need manual</span></td><td>High</td></tr>
+          <tr><td>TC-20</td><td>Biometric unsupported</td><td>Máy không biometric/chưa enroll</td><td>Fallback PIN, không crash</td><td>Chưa check capability</td><td><span class="badge fail">Fail risk</span></td><td>Medium</td></tr>
+          <tr><td>TC-21</td><td>Rotate/resume</td><td>Đăng nhập form/scan/lock rồi xoay</td><td>Không mất state quan trọng</td><td>Nhiều state dùng <code>remember</code></td><td><span class="badge manual">Need manual</span></td><td>Medium</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Kết Quả Kiểm Tra Kỹ Thuật</h2>
+      <table>
+        <thead>
+          <tr><th>Lệnh</th><th>Kết quả</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\gradlew.bat testDebugUnitTest</code></td><td><span class="badge pass">Pass</span></td><td>Đã pass sau khi bổ sung test cho các bug đã fix.</td></tr>
+          <tr><td><code>.\gradlew.bat assembleDebug</code></td><td><span class="badge pass">Pass</span></td><td>Compile/KSP/Hilt/package debug OK.</td></tr>
+          <tr><td><code>.\gradlew.bat lintDebug</code></td><td><span class="badge pass">Pass</span></td><td>BUG-010 đã xử lý; còn warnings nhưng không còn lint error chặn build.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Lint warning đáng chú ý</h3>
+      <ul>
+        <li><code>DefaultLocale</code>: nhiều <code>String.format("%,.0f")</code> không truyền Locale.</li>
+        <li><code>AppBundleLocaleChanges</code>: app đổi ngôn ngữ runtime nhưng chưa cấu hình language split/Play Core.</li>
+        <li><code>DiscouragedApi</code>: dùng <code>resources.getIdentifier()</code> cho icon category.</li>
+        <li>Nhiều dependency có version mới; cần upgrade có kiểm thử hồi quy.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Đánh Giá Tổng Quan</h2>
+      <table>
+        <thead>
+          <tr><th>Nhóm</th><th>Đánh giá</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Đã ổn</td><td>Build, unit test parser/OCR schedule, cấu trúc MVVM/Hilt, Firestore rules theo owner.</td></tr>
+          <tr><td>Rủi ro cao</td><td>Reminder sau reboot, sync giao dịch offline-first, sync category/budget, API key Gemini, PIN hash.</td></tr>
+          <tr><td>Cần manual test thêm</td><td>Google login, thêm/sửa/xóa giao dịch offline rồi bật mạng, OCR camera/gallery, biometric, notification/exact alarm, xoay màn hình.</td></tr>
+          <tr><td>Cần refactor</td><td>Local-first repository cho expense, sync state/pending queue, stable ID cho category, enum thay chuỗi hiển thị, local cleanup theo userId.</td></tr>
+          <tr><td>Có thể gây sai số liệu tài chính</td><td>Giao dịch offline chưa sync nhưng UI không thể hiện trạng thái, update/delete cloud fail bị bỏ qua, categoryId đổi sau sync, budget sai category.</td></tr>
+          <tr><td>Điểm mạnh</td><td>Có repository/usecase, parser có test, Firestore security rule không mở công khai.</td></tr>
+          <tr><td>Điểm yếu</td><td>Sync model chưa ổn định, chưa có offline-first rõ ràng cho giao dịch, bảo mật client key/PIN yếu, UI state nhiều chỗ chưa saveable.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>7. Kế Hoạch Ưu Tiên Sửa Lỗi</h2>
+      <table>
+        <thead>
+          <tr><th>Ưu tiên</th><th>Lỗi</th><th>Hướng xử lý</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge high">High</span></td><td>BUG-004</td><td>Ưu tiên thiết kế lại quản lý giao dịch theo offline-first: Room source of truth, sync state, pending operation, retry khi có mạng, xử lý pending delete/update.</td></tr>
+          <tr><td><span class="badge high">High</span></td><td>BUG-001, BUG-002, BUG-003</td><td>Đã có hướng xử lý/fix từng phần; cần regression test trên thiết bị thật sau khi hoàn thiện offline-first.</td></tr>
+          <tr><td><span class="badge high">High</span></td><td>BUG-005, BUG-006, BUG-007</td><td>Bổ sung migration, stable category ID, chặn/reassign category đang được dùng.</td></tr>
+          <tr><td><span class="badge high">High</span></td><td>BUG-008, BUG-009</td><td>Thiết kế lại PIN storage và Gemini key qua backend/proxy.</td></tr>
+          <tr><td><span class="badge medium">Medium</span></td><td>BUG-010, BUG-011, BUG-012, BUG-013, BUG-014</td><td>Sửa lint, biometric capability, enum hóa state, cleanup theo userId, repeat key cố định.</td></tr>
+          <tr><td><span class="badge low">Low</span></td><td>Warnings/tối ưu UI</td><td>Locale format, dependency update, vector/resource cleanup sau khi chốt chức năng chính.</td></tr>
+        </tbody>
+      </table>
+
+      <p class="muted">Ghi chú: Báo cáo này được tạo theo yêu cầu "chỉ phân tích, kiểm thử và báo cáo lỗi"; chưa có code fix nào được áp dụng trong app.</p>
+    </section>
+  </main>
+</body>
+</html>
